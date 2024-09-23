@@ -69,12 +69,14 @@ def Z() -> np.array:
 #APPLY GATES
 
 
-def apply_one_qubit_gate(state:np.array,gate,qbit:int)->np.array:
+def apply_one_qubit_gate(state:np.array,gate:np.array,qbit:int)->np.array:
     state=np.array(state) # perform deep copy
     # Number of dimensions of the state tensor
     num_dims = len(state.shape)-1
     if(qbit>num_dims):
         raise ValueError("qbit index bigger than dimension")
+    if(gate.shape!=(2,2)):
+        raise ValueError("wrong gate shape")
     
     qbit=num_dims-qbit
 
@@ -87,6 +89,36 @@ def apply_one_qubit_gate(state:np.array,gate,qbit:int)->np.array:
 
     # Construct the einsum string
     einsum_string = f'{input_subs},{"ab"}->{output_subs}'
+    print(einsum_string)
+
+    # Apply the gate using einsum
+    return np.einsum(einsum_string, state, gate)
+
+def apply_two_qubit_gate(state:np.array,gate:np.array,qbit_one:int,qbit_two:int)->np.array:
+    num_dims = len(state.shape)
+    if(qbit_one>=num_dims or qbit_two>=num_dims):
+        raise ValueError("qbit index bigger than dimension")
+    if(gate.shape!=(2,2,2,2)):
+        raise ValueError("wrong gate shape")
+    qbit_one = num_dims - 1 - qbit_one
+    qbit_two = num_dims - 1 - qbit_two
+
+    # Generate subscripts for the state
+    input_subs = ''.join(chr(101 + i) for i in range(num_dims))  # 'abcd...'
+    
+    # Insert 'a' and 'b' for gate operation at the corresponding positions
+    new_input_subs = input_subs[:qbit_one] + 'a' + input_subs[qbit_one+1:]
+    new_input_subs = new_input_subs[:qbit_two] + 'b' + new_input_subs[qbit_two+1:]
+
+    gate_subs = new_input_subs[qbit_one] + new_input_subs[qbit_two]
+
+    # Generate the output subscripts by replacing 'a' and 'b' with new indices 'c' and 'd'
+    output_subs = new_input_subs[:qbit_one] + 'c' + new_input_subs[qbit_one+1:]
+    output_subs = output_subs[:qbit_two] + 'd' + output_subs[qbit_two+1:]
+
+    # Construct the einsum string
+    einsum_string = f'{new_input_subs},{gate_subs}cd->{output_subs}'
+    print(einsum_string)
     
     # Apply the gate using einsum
     return np.einsum(einsum_string, state, gate)
@@ -113,6 +145,8 @@ def plot_nqbit_prob(MPS:np.array):
 
 
 if __name__ == "__main__":
-    state=init_state(2)
+    state=init_state(3)
+    state=apply_one_qubit_gate(state,H(),0)
+    state=apply_one_qubit_gate(state,H(),2)
+    state=apply_two_qubit_gate(state,CNOT(),0,1)
     print(state)
-    plot_nqbit_prob(state)

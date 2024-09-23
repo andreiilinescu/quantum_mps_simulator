@@ -29,6 +29,9 @@ class QuantumSimulator:
         self.qiskit_circ.z(qbit)
 
 
+    def CNOT(self,control:int,target:int):
+        self.state=npt.apply_two_qubit_gate(self.state,npt.CNOT(),control,target)
+        self.qiskit_circ.cx(control,target)
 
 
 
@@ -86,14 +89,13 @@ class QuantumSimulator:
 
 
 if __name__ == "__main__":
-    q=QuantumSimulator(2)
+    q=QuantumSimulator(4)
     q.h(0)
-    q.x(1)
-    q.z(1)
-    q.x(1)
-    q.y(0)
-    q.x(0)
-    q.z(0)
-    q.x(1)
+    q.h(2)
+    q.x(2)
+    q.y(1)
+    q.CNOT(0,1)
+    q.CNOT(2,1)
     q.draw_qiskit_circuit()
     q.compare_results()
+    q.plot_own_probabilities()
