@@ -34,37 +34,67 @@ def init_state(n: int = 1, init_arr: List[float] = None)->np.array:
     state = state_list[0]
 
     for qbit in state_list[1:]:
-        state = np.tensordot(state, qbit, axes=-1)
+        state = np.tensordot(state, qbit, axes=0)
 
     return state
 
 #GATES
 
-
-def CNOT()->np.array:
+def create_two_qbit_control_gate(gate:np.array) -> np.array:
     C = np.array([[0, 0], [0, 1]])
     I = np.array([[1, 0], [0, 1]])
-    SIG_X = np.array([[0, 1], [1, 0]])
+    SIG = gate
 
-    CNOT_1 = np.array([I-C, C])
+    Control_1 = np.array([I-C, C], dtype=complex)
+    Control_2 = np.array([I, SIG], dtype=complex)
 
-    CNOT_2 = np.array([I, SIG_X])
+    return np.einsum("ikj,lkm->ijlm", Control_1, Control_2)
 
-    return np.einsum("ikj,lkm->ijlm", CNOT_1, CNOT_2)
+#TWO QUBIT GATES
 
+def CH()->np.array:
+    return create_two_qbit_control_gate(H())
+
+def CNOT()->np.array:
+    return create_two_qbit_control_gate(X())
+
+def CX() -> np.array:
+    return create_two_qbit_control_gate(X())
+
+def CY() -> np.array:
+    return create_two_qbit_control_gate(Y())
+
+def CZ() -> np.array:
+    return create_two_qbit_control_gate(Z())
+
+def CS() -> np.array:
+    return create_two_qbit_control_gate(S())
+
+def CSDG() -> np.array:
+    return create_two_qbit_control_gate(SDG())
+
+#ONE QUBIT GATES
 
 def H()->np.array:
-    return 1/np.sqrt(2)*np.array([[1,1],[1,-1]])
+    return 1/np.sqrt(2)*np.array([[1,1],[1,-1]],dtype=complex)
 
 def X()->np.array:
-    return np.array([[0, 1], [1, 0]])
+    return np.array([[0, 1], [1, 0]],dtype=complex)
 
 def Y()->np.array:
-    return np.array([[0, -1j], [1j, 0]])
+    return np.array([[0, -1j], [1j, 0]],dtype=complex)
 
 def Z() -> np.array:
-    return np.array([[1, 0], [0, -1]])
+    return np.array([[1, 0], [0, -1]],dtype=complex)
 
+def S() -> np.array:
+    return np.array([[1,0],[0,1j]],dtype=complex)
+
+def SDG() -> np.array:
+    return np.array([[1,0],[0,-1j]],dtype=complex)
+
+def P(theta:float) -> np.array:
+    return np.array([[1,0],[0,np.exp(1j * theta)]],dtype=complex)
 
 #APPLY GATES
 
@@ -72,20 +102,26 @@ def Z() -> np.array:
 def apply_one_qubit_gate(state:np.array,gate:np.array,qbit:int)->np.array:
     state=np.array(state) # perform deep copy
     # Number of dimensions of the state tensor
-    num_dims = len(state.shape)-1
+    num_dims = len(state.shape)
     if(qbit>num_dims):
         raise ValueError("qbit index bigger than dimension")
     if(gate.shape!=(2,2)):
         raise ValueError("wrong gate shape")
     
-    qbit=num_dims-qbit
+    axis=num_dims-qbit-1 #convert to qiskit qbit numbering
 
     #skip a and b chars
-    input_subs = ''.join(chr(99 + i) for i in range(num_dims))
+    indices = [chr(99 + i) for i in range(num_dims)]
+    input_subs = ''.join(indices)
+    output_subs = ''.join(indices)
 
-    # Replaces the k-th axis in input_subs with new index from gate_subs  
-    input_subs = input_subs[:qbit] + 'a' + input_subs[qbit:]
-    output_subs = input_subs[:qbit] + 'b' + input_subs[qbit+1:]
+    # Replaces the k-th axis in input_subs with new index from gate_subs
+    input_subs_list = list(input_subs)
+    output_subs_list = list(output_subs)
+    input_subs_list[axis] = 'a'
+    output_subs_list[axis] = 'b'  
+    input_subs = ''.join(input_subs_list)
+    output_subs = ''.join(output_subs_list)
 
     # Construct the einsum string
     einsum_string = f'{input_subs},{"ab"}->{output_subs}'
@@ -96,32 +132,32 @@ def apply_one_qubit_gate(state:np.array,gate:np.array,qbit:int)->np.array:
 
 def apply_two_qubit_gate(state:np.array,gate:np.array,qbit_one:int,qbit_two:int)->np.array:
     num_dims = len(state.shape)
-    if(qbit_one>=num_dims or qbit_two>=num_dims):
+    if(qbit_one>num_dims or qbit_two>num_dims):
         raise ValueError("qbit index bigger than dimension")
     if(gate.shape!=(2,2,2,2)):
         raise ValueError("wrong gate shape")
-    qbit_one = num_dims - 1 - qbit_one
-    qbit_two = num_dims - 1 - qbit_two
-
-    # Generate subscripts for the state
-    input_subs = ''.join(chr(101 + i) for i in range(num_dims))  # 'abcd...'
+    axis1 = num_dims-qbit_one-1
+    axis2 = num_dims-qbit_two-1
+     # Build indices for einsum
+    indices = [chr(101 + i) for i in range(num_dims)]
+    input_subs = ''.join(indices)
+    output_subs = ''.join(indices)
     
-    # Insert 'a' and 'b' for gate operation at the corresponding positions
-    new_input_subs = input_subs[:qbit_one] + 'a' + input_subs[qbit_one+1:]
-    new_input_subs = new_input_subs[:qbit_two] + 'b' + new_input_subs[qbit_two+1:]
-
-    gate_subs = new_input_subs[qbit_one] + new_input_subs[qbit_two]
-
-    # Generate the output subscripts by replacing 'a' and 'b' with new indices 'c' and 'd'
-    output_subs = new_input_subs[:qbit_one] + 'c' + new_input_subs[qbit_one+1:]
-    output_subs = output_subs[:qbit_two] + 'd' + output_subs[qbit_two+1:]
-
-    # Construct the einsum string
-    einsum_string = f'{new_input_subs},{gate_subs}cd->{output_subs}'
-    print(einsum_string)
+    # Replace indices at axis1 and axis2
+    input_subs_list = list(input_subs)
+    output_subs_list = list(output_subs)
     
+    input_subs_list[axis1] = 'a'
+    input_subs_list[axis2] = 'b'
+    output_subs_list[axis1] = 'c'
+    output_subs_list[axis2] = 'd'
+    
+    input_subs = ''.join(input_subs_list)
+    output_subs = ''.join(output_subs_list)
+    
+    einsum_str = f'{input_subs},acdb->{output_subs}'
     # Apply the gate using einsum
-    return np.einsum(einsum_string, state, gate)
+    return np.einsum(einsum_str, state, gate)
 
 
 
@@ -146,7 +182,8 @@ def plot_nqbit_prob(MPS:np.array):
 
 if __name__ == "__main__":
     state=init_state(3)
+    print(state)
     state=apply_one_qubit_gate(state,H(),0)
     state=apply_one_qubit_gate(state,H(),2)
-    state=apply_two_qubit_gate(state,CNOT(),0,1)
+    state=apply_two_qubit_gate(state,CY(),0,1)
     print(state)

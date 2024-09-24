@@ -27,11 +27,47 @@ class QuantumSimulator:
     def z(self,qbit:int):
         self.state=npt.apply_one_qubit_gate(self.state,npt.Z(),qbit)
         self.qiskit_circ.z(qbit)
+    
+    def s(self,qbit:int):
+        self.state=npt.apply_one_qubit_gate(self.state,npt.S(),qbit)
+        self.qiskit_circ.s(qbit)
 
+    def sdg(self,qbit:int):
+        self.state=npt.apply_one_qubit_gate(self.state,npt.SDG(),qbit)
+        self.qiskit_circ.sdg(qbit)
+    
+    def p(self,qbit:int,angle:float):
+        """
+            Args:
+                qbit (int): The number of the qbit we are applying the gate to
+                angle (float): The phase shift angle in radians
+        """
+        self.state=npt.apply_one_qubit_gate(self.state,npt.P(angle),qbit)
+        self.qiskit_circ.p(angle,qbit)
 
-    def CNOT(self,control:int,target:int):
+    def cnot(self,control:int,target:int):
         self.state=npt.apply_two_qubit_gate(self.state,npt.CNOT(),control,target)
         self.qiskit_circ.cx(control,target)
+    
+    def ch(self,control:int,target:int):
+        self.state=npt.apply_two_qubit_gate(self.state,npt.CH(),control,target)
+        self.qiskit_circ.ch(control,target)
+
+    def cx(self,control:int,target:int):
+        self.state=npt.apply_two_qubit_gate(self.state,npt.CX(),control,target)
+        self.qiskit_circ.cx(control,target)
+    
+    def cy(self,control:int,target:int):
+        self.state=npt.apply_two_qubit_gate(self.state,npt.CY(),control,target)
+        self.qiskit_circ.cy(control,target)
+    
+    def cz(self,control:int,target:int):
+        self.state=npt.apply_two_qubit_gate(self.state,npt.CZ(),control,target)
+        self.qiskit_circ.cz(control,target)
+    
+    def cs(self,control:int,target:int):
+        self.state=npt.apply_two_qubit_gate(self.state,npt.CS(),control,target)
+        self.qiskit_circ.cs(control,target)
 
 
 
@@ -48,12 +84,12 @@ class QuantumSimulator:
     
     def measure_qiskit_probablities(self) -> np.array:
         statevector=self.get_qiskit_statevector()
-        probs=statevector.probabilities(decimals=2)
+        probs=statevector.probabilities(decimals=5)
         return np.array(probs)
     
     def measure_own_probabilities(self) -> np.array:
         out=np.array(self.state)
-        out=np.around(np.abs(out.flatten()).__pow__(2),2)
+        out=np.around(np.abs(out.flatten()).__pow__(2),5)
         return out
     
     def plot_qiskit_probabilities(self):
@@ -85,17 +121,66 @@ class QuantumSimulator:
         print(qiskit)
         print(f"Conclusion: {result}")
 
-    
+    @classmethod
+    def setup_bell_state(cls, num_qubits: int) -> 'QuantumSimulator':
+        """
+        Sets up a Bell state with the specified number of qubits.
 
+        Args:
+            num_qubits (int): The number of qubits in the GHZ state.
+
+        Returns:
+            QuantumSimulator: An instance of QuantumSimulator with GHZ state prepared.
+        """
+        if num_qubits < 2:
+            raise ValueError("Number of qubits must be at least 2 to create a Bell state.")
+
+        simulator = cls(num_qubits)
+        simulator.h(0)              # Apply Hadamard gate to the first qubit
+        simulator.cnot(0, 1)        # Apply CNOT gate with qubit 0 as control and qubit 1 as target
+
+        # Remaining qubits (if any) are left in the |0⟩ state
+        return simulator
+
+    @classmethod
+    def setup_ghz_state(cls, num_qubits: int) -> 'QuantumSimulator':
+        """
+        Sets up a GHZ state with the specified number of qubits.
+
+        Args:
+            num_qubits (int): The number of qubits in the GHZ state.
+
+        Returns:
+            QuantumSimulator: An instance of QuantumSimulator with GHZ state prepared.
+        """
+        if num_qubits < 2:
+            raise ValueError("Number of qubits must be at least 2 to create a GHZ state.")
+        
+        simulator = cls(num_qubits)
+        simulator.h(0)  # Apply Hadamard gate to the first qubit
+        
+        # Apply CNOT gates from the first qubit to all other qubits
+        for target in range(1, num_qubits):
+            simulator.cnot(0, target)
+        
+        return simulator
+    
+    @classmethod
+    def setup_phase_shift_example_state(cls) -> 'QuantumSimulator':
+        simulator = cls(1)
+        simulator.h(0)
+        simulator.p(0, np.pi / 4)
+        simulator.h(0)
+        return simulator
 
 if __name__ == "__main__":
-    q=QuantumSimulator(4)
-    q.h(0)
-    q.h(2)
-    q.x(2)
-    q.y(1)
-    q.CNOT(0,1)
-    q.CNOT(2,1)
-    q.draw_qiskit_circuit()
-    q.compare_results()
-    q.plot_own_probabilities()
+    # Create a Bell state with 2 qubits
+    bell_simulator = QuantumSimulator.setup_ghz_state(2)
+    bell_simulator.draw_qiskit_circuit()
+    bell_simulator.compare_results()
+    bell_simulator.plot_own_probabilities()
+    # q=QuantumSimulator(5)
+    simulator = QuantumSimulator.setup_phase_shift_example_state()
+    simulator.draw_qiskit_circuit()
+    simulator.compare_results()
+    simulator.plot_own_probabilities()
