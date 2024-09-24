@@ -36,6 +36,10 @@ class QuantumSimulator:
         self.state=npt.apply_one_qubit_gate(self.state,npt.SDG(),qbit)
         self.qiskit_circ.sdg(qbit)
     
+    def t(self, qbit:int):
+        self.state=npt.apply_one_qubit_gate(self.state,npt.T(),qbit)
+        self.qiskit_circ.t(qbit)
+    
     def p(self,qbit:int,angle:float):
         """
             Args:

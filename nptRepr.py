@@ -93,6 +93,9 @@ def S() -> np.array:
 def SDG() -> np.array:
     return np.array([[1,0],[0,-1j]],dtype=complex)
 
+def T() -> np.array:
+    return np.array([[1,0],[0,np.exp(1j*np.pi/4)]],dtype=complex)
+
 def P(theta:float) -> np.array:
     return np.array([[1,0],[0,np.exp(1j * theta)]],dtype=complex)
 
