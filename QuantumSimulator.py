@@ -81,6 +81,14 @@ class QuantumSimulator:
     def cp(self, control: int, target: int, angle: float):
         self.state = npt.apply_two_qubit_gate(self.state, npt.CP(angle), control, target)
         self.qiskit_circ.cp(angle, control, target)
+    
+    def swap(self,qubit1:int,qubit2:int):
+        self.state=npt.apply_two_qubit_gate(self.state,npt.SWAP(),qubit1,qubit2)
+        self.qiskit_circ.swap(qubit1,qubit2)
+    
+    def toffoli(self, control1:int,control2:int,target:int):
+        self.state=npt.apply_three_qubit_gate(self.state,npt.TOFFOLI(),control1,control2,target)
+        self.qiskit_circ.ccx(control1,control2,target)
 
     def get_qiskit_statevector(self) -> Statevector:
         circ = self.qiskit_circ.copy()
@@ -107,7 +115,6 @@ class QuantumSimulator:
         probs = self.measure_qiskit_probablities()
         n = self.qbits
         labels = [f"{i:0{n}b}" for i in range(2**n)]
-        print(probs)
         plt.bar(labels, probs, color="skyblue")
         plt.xlabel("Quantum States")
         plt.ylabel("Probability")
@@ -196,13 +203,29 @@ class QuantumSimulator:
 
 
 if __name__ == "__main__":
-    # Create a Bell state with 2 qubits
-    bell_simulator = QuantumSimulator.setup_ghz_state(2)
-    bell_simulator.draw_qiskit_circuit()
-    bell_simulator.compare_results()
-    bell_simulator.plot_own_probabilities()
-    # q=QuantumSimulator(5)
-    simulator = QuantumSimulator.setup_phase_shift_example_state()
+    # # Create a Bell state with 2 qubits
+    # bell_simulator = QuantumSimulator(2)
+    # bell_simulator.h(0)
+    # bell_simulator.cnot(0,1)
+    # bell_simulator.draw_qiskit_circuit()
+    # bell_simulator.compare_results()
+    # bell_simulator.plot_own_probabilities()
+    # # q=QuantumSimulator(5)
+    # simulator = QuantumSimulator.setup_phase_shift_example_state()
+    # simulator.draw_qiskit_circuit()
+    # simulator.compare_results()
+    # simulator.plot_own_probabilities()
+    n=4
+    simulator = QuantumSimulator(n)  # QFT on 3 qubits
+    for i in range(n):
+        simulator.h(i)
+        for j in range(i + 1, n):
+            angle = np.pi / (2 ** (j - i))
+            simulator.cp(i, j, angle)
+    for i in range(n // 2):
+        simulator.swap(i, n - i - 1)
+
+    
     simulator.draw_qiskit_circuit()
     simulator.compare_results()
     simulator.plot_own_probabilities()
