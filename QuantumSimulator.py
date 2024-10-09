@@ -5,7 +5,7 @@ from qiskit.quantum_info import Statevector
 import numpy as np
 import matplotlib.pyplot as plt
 from termcolor import colored
-
+from MPS import MPS
 
 class QuantumSimulator:
     def __init__(self, qbits: int):
@@ -142,6 +142,7 @@ class QuantumSimulator:
         print("Qiskit:")
         print(qiskit)
         print(f"Conclusion: {result}")
+            
 
     @classmethod
     def setup_bell_state(cls, num_qubits: int) -> "QuantumSimulator":
@@ -200,8 +201,8 @@ class QuantumSimulator:
         simulator.p(0, np.pi / 4)
         simulator.h(0)
         return simulator
-
-
+    
+    
 if __name__ == "__main__":
     # # Create a Bell state with 2 qubits
     # bell_simulator = QuantumSimulator(2)
@@ -215,17 +216,20 @@ if __name__ == "__main__":
     # simulator.draw_qiskit_circuit()
     # simulator.compare_results()
     # simulator.plot_own_probabilities()
-    n=4
-    simulator = QuantumSimulator(n)  # QFT on 3 qubits
-    for i in range(n):
-        simulator.h(i)
-        for j in range(i + 1, n):
-            angle = np.pi / (2 ** (j - i))
-            simulator.cp(i, j, angle)
-    for i in range(n // 2):
-        simulator.swap(i, n - i - 1)
+    # n=4
+    # simulator = QuantumSimulator(n)  # QFT on 3 qubits
+    # for i in range(n):
+    #     simulator.h(i)
+    #     for j in range(i + 1, n):
+    #         angle = np.pi / (2 ** (j - i))
+    #         simulator.cp(i, j, angle)
+    # for i in range(n // 2):
+    #     simulator.swap(i, n - i - 1)
 
     
-    simulator.draw_qiskit_circuit()
-    simulator.compare_results()
-    simulator.plot_own_probabilities()
+    # simulator.draw_qiskit_circuit()
+    # simulator.compare_results()
+    # simulator.plot_own_probabilities()
+    m=MPS(5)
+    print(m.tensors)
+    print(m.get_statevector())
