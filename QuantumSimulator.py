@@ -51,6 +51,7 @@ class QuantumSimulator:
         self.qiskit_circ.p(angle, qbit)
 
     def cnot(self, control: int, target: int):
+        print(self.state)
         self.state = npt.apply_two_qubit_gate(self.state, npt.CNOT(), control, target)
         self.qiskit_circ.cx(control, target)
 
@@ -205,11 +206,13 @@ class QuantumSimulator:
     
 if __name__ == "__main__":
     # # Create a Bell state with 2 qubits
-    # bell_simulator = QuantumSimulator(2)
-    # bell_simulator.h(0)
-    # bell_simulator.cnot(0,1)
+    bell_simulator = QuantumSimulator(3)
+    bell_simulator.h(0)
+    bell_simulator.cnot(1,2)
+
+    # print(bell_simulator.state)
     # bell_simulator.draw_qiskit_circuit()
-    # bell_simulator.compare_results()
+    bell_simulator.compare_results()
     # bell_simulator.plot_own_probabilities()
     # # q=QuantumSimulator(5)
     # simulator = QuantumSimulator.setup_phase_shift_example_state()
@@ -230,6 +233,6 @@ if __name__ == "__main__":
     # simulator.draw_qiskit_circuit()
     # simulator.compare_results()
     # simulator.plot_own_probabilities()
-    m=MPS(5)
-    print(m.tensors)
-    print(m.get_statevector())
+    # m=MPS(5)
+    # print(m.tensors)
+    # print(m.get_statevector())

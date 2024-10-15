@@ -44,7 +44,7 @@ def init_state(n: int = 1, init_arr: List[float] = None) -> np.array:
 
 
 def create_two_qbit_control_gate(gate: np.array) -> np.array:
-    I=np.eye(4)
+    I=np.eye(4, dtype=np.complex128)
     I[2][2]=gate[0][0]
     I[2][3]=gate[0][1]
     I[3][2]=gate[1][0]
@@ -54,7 +54,7 @@ def create_two_qbit_control_gate(gate: np.array) -> np.array:
 # THREE QUBIT GATES
 
 def TOFFOLI() -> np.array:
-    i=np.eye(8)
+    i=np.eye(8, dtype=np.complex128)
     i[6][6]=0
     i[6][7]=1
     i[7][7]=0
@@ -111,35 +111,35 @@ def SWAP() -> np.array:
 
 
 def H() -> np.array:
-    return 1 / np.sqrt(2) * np.array([[1, 1], [1, -1]], dtype=complex)
+    return 1 / np.sqrt(2) * np.array([[1, 1], [1, -1]], dtype=np.complex128)
 
 
 def X() -> np.array:
-    return np.array([[0, 1], [1, 0]], dtype=complex)
+    return np.array([[0, 1], [1, 0]], dtype=np.complex128)
 
 
 def Y() -> np.array:
-    return np.array([[0, -1j], [1j, 0]], dtype=complex)
+    return np.array([[0, -1j], [1j, 0]], dtype=np.complex128)
 
 
 def Z() -> np.array:
-    return np.array([[1, 0], [0, -1]], dtype=complex)
+    return np.array([[1, 0], [0, -1]], dtype=np.complex128)
 
 
 def S() -> np.array:
-    return np.array([[1, 0], [0, 1j]], dtype=complex)
+    return np.array([[1, 0], [0, 1j]], dtype=np.complex128)
 
 
 def SDG() -> np.array:
-    return np.array([[1, 0], [0, -1j]], dtype=complex)
+    return np.array([[1, 0], [0, -1j]], dtype=np.complex128)
 
 
 def T() -> np.array:
-    return np.array([[1, 0], [0, np.exp(1j * np.pi / 4)]], dtype=complex)
+    return np.array([[1, 0], [0, np.exp(1j * np.pi / 4)]], dtype=np.complex128)
 
 
 def P(theta: float) -> np.array:
-    return np.array([[1, 0], [0, np.exp(1j * theta)]], dtype=complex)
+    return np.array([[1, 0], [0, np.exp(1j * theta)]], dtype=np.complex128)
 
 
 # APPLY GATES
@@ -178,7 +178,7 @@ def apply_one_qubit_gate(state: np.array, gate: np.array, qbit: int) -> np.array
 
 
 def apply_two_qubit_gate(
-    state: np.array, gate: np.array, qbit_one: int, qbit_two: int
+    state: np.array, gate: np.array, qbit_one: int, qbit_two: int, mps=False
 ) -> np.array:
     num_dims = len(state.shape)
     if qbit_one > num_dims or qbit_two > num_dims:
@@ -187,6 +187,9 @@ def apply_two_qubit_gate(
         raise ValueError("wrong gate shape")
     axis1 = num_dims - qbit_one - 1
     axis2 = num_dims - qbit_two - 1
+    if mps==True:
+        axis1=qbit_one
+        axis2=qbit_two
     # Build indices for einsum
     indices = [chr(101 + i) for i in range(num_dims)]
     input_subs = "".join(indices)
@@ -208,6 +211,7 @@ def apply_two_qubit_gate(
     # Apply the gate using einsum
     print(einsum_str)
     return np.einsum(einsum_str, state, gate)
+
 
 def apply_three_qubit_gate(
     state: np.array, gate: np.array, qbit_one: int, qbit_two: int, qbit_three:int
