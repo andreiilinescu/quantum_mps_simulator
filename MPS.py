@@ -136,12 +136,9 @@ class MPS:
 
         #Truncate SVD
         if len(S)>self.max_bond:
-            k=len(S)-self.max_bond-1
-            idx=np.argpartition(S,k)[:k+1]
-            S=S[~idx]
-            U = U[:,~idx]
-            Vh = Vh[~idx,:]
-
+            U = U[:, :self.max_bond]
+            S = S[:self.max_bond]
+            Vh = Vh[:self.max_bond, :]
         S=np.diag(S)
 
 
