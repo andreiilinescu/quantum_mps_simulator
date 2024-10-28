@@ -206,9 +206,9 @@ class QuantumSimulator:
     
 if __name__ == "__main__":
     # # Create a Bell state with 2 qubits
-    bell_simulator = QuantumSimulator(3)
-    bell_simulator.h(0)
-    bell_simulator.cnot(1,2)
+    bell_simulator = QuantumSimulator(2)
+    bell_simulator.h(1)
+    bell_simulator.cnot(0,1)
 
     # print(bell_simulator.state)
     # bell_simulator.draw_qiskit_circuit()

@@ -2,9 +2,9 @@ import numpy as np
 import nptRepr as npt
 
 class MPS:
-    def __init__(self, qbits: int, initial_state: list | None = None):
+    def __init__(self, qbits: int,max_bond:int =5 , initial_state: list | None = None):
         self.num_qubits = qbits
-        self.bonding = [1]*(qbits+1)
+        self.max_bond=max_bond
         if initial_state:
             self.tensors = self.statevector_to_mps(initial_state)
         else:
@@ -67,37 +67,49 @@ class MPS:
     def apply_two_qubit(self,qubit_one:int,qubit_two:int,gate):
         if qubit_one >= len(self.tensors) or qubit_two>=len(self.tensors):
             raise ValueError("qubit number too large")
+        
         t1=self.tensors[qubit_one]
         t2=self.tensors[qubit_two]
+        l=t1.shape[0]
+        r=t2.shape[2]
+
         #contract tensors into one big tensor
-        t=np.tensordot(t1, t2, axes=([-1], [0])).squeeze()
-        print(t)
-        t=npt.apply_two_qubit_gate(t,gate,0,1,mps=True)
-        print(t)
-        #increase bonding dimension
-        self.bonding[qubit_one+1]=self.bonding[qubit_one]+self.bonding[qubit_one+2]
+        t=np.tensordot(t1, t2, axes=([-1], [0]))
+        t=npt.apply_two_qubit_gate(t,gate,1,2)
+
 
         #perform SVD
-        dim = int(t.size // 2)
-        t=t.reshape(2, dim)
+        t=t.reshape(l*2, r*2)
         
         U, S, Vh = np.linalg.svd(t, full_matrices=False)
+        print(S)
 
-        Lambda = np.sqrt(np.diag(S))
+        if len(S)>self.max_bond:
+            k=len(S)-self.max_bond-1
+            idx=np.argpartition(S,k)[:k+1]
+            print(idx)
+            S=S[~idx]
+            print(S)
+            U = U[:,~idx]
+            Vh = Vh[~idx,:]
 
-        U=U.reshape(self.bonding[qubit_one],2,self.bonding[qubit_one+1])
-        U = U @ Lambda
+        S=np.diag(S)
+
+
+        U=U.reshape(l,2,int(U.size//l//2))
+        
+        Vh = S @ Vh
+        Vh=Vh.reshape(int(Vh.size//r//2),2,r)
+
         self.tensors[qubit_one]=U
-        Vh = Lambda @ Vh
-        Vh=Vh.reshape(self.bonding[qubit_one+1],2,self.bonding[qubit_one+2])
         self.tensors[qubit_two]=Vh
 
         
 
 if __name__ == "__main__":
-    m = MPS(3)
-    m.apply_one_qubit_gate(0,npt.H())
-    m.apply_two_qubit(1,2,npt.CNOT())
+    m = MPS(2,max_bond=3)
+    m.apply_one_qubit_gate(1,npt.H())
+    m.apply_two_qubit(0,1,npt.CNOT())
     # m.apply_two_qubit(0,1,npt.CNOT())
     print("\n")
     for x in m.tensors:
