@@ -59,7 +59,7 @@ def TOFFOLI() -> np.array:
     i[6][7]=1
     i[7][7]=0
     i[7][6]=1
-    print(i)
+    # print(i)
     return i.reshape((2,2,2,2,2,2))
 
 
@@ -171,7 +171,7 @@ def apply_one_qubit_gate(state: np.array, gate: np.array, qbit: int) -> np.array
 
     # Construct the einsum string
     einsum_string = f'{input_subs},{"ab"}->{output_subs}'
-    print(einsum_string)
+    # print(einsum_string)
 
     # Apply the gate using einsum
     return np.einsum(einsum_string, state, gate)
@@ -209,7 +209,7 @@ def apply_two_qubit_gate(
 
     einsum_str = f"{input_subs},abcd->{output_subs}"
     # Apply the gate using einsum
-    print(einsum_str)
+    # print(einsum_str)
     return np.einsum(einsum_str, state, gate)
 
 

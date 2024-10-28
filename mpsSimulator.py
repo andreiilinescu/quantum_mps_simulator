@@ -7,38 +7,47 @@ import matplotlib.pyplot as plt
 from termcolor import colored
 from MPS import MPS
 
-class QuantumSimulator:
+MAX_BOND=10
+class SimMPS:
     def __init__(self, qbits: int):
         self.qbits = qbits
-        self.state = npt.init_state(qbits)
+        self.sim_np = MPS(qbits,max_bond=MAX_BOND,use_sql=False)
+        self.sim_sql= MPS(qbits,max_bond=MAX_BOND,use_sql=True)
         self.qiskit_circ = QuantumCircuit(qbits)
 
     def h(self, qbit: int):
-        self.state = npt.apply_one_qubit_gate(self.state, npt.H(), qbit)
+        self.sim_np.apply_one_qubit_gate(qbit,npt.H())
+        self.sim_sql.apply_one_qubit_gate(qbit,npt.H())
         self.qiskit_circ.h(qbit)
 
     def x(self, qbit: int):
-        self.state = npt.apply_one_qubit_gate(self.state, npt.X(), qbit)
+        self.sim_np.apply_one_qubit_gate(qbit,npt.X())
+        self.sim_sql.apply_one_qubit_gate(qbit,npt.X())
         self.qiskit_circ.x(qbit)
 
     def y(self, qbit: int):
-        self.state = npt.apply_one_qubit_gate(self.state, npt.Y(), qbit)
+        self.sim_np.apply_one_qubit_gate(qbit,npt.Y())
+        self.sim_sql.apply_one_qubit_gate(qbit,npt.Y())
         self.qiskit_circ.y(qbit)
 
     def z(self, qbit: int):
-        self.state = npt.apply_one_qubit_gate(self.state, npt.Z(), qbit)
+        self.sim_np.apply_one_qubit_gate(qbit,npt.Z())
+        self.sim_sql.apply_one_qubit_gate(qbit,npt.Z())
         self.qiskit_circ.z(qbit)
 
     def s(self, qbit: int):
-        self.state = npt.apply_one_qubit_gate(self.state, npt.S(), qbit)
+        self.sim_np.apply_one_qubit_gate(qbit,npt.S())
+        self.sim_sql.apply_one_qubit_gate(qbit,npt.S())
         self.qiskit_circ.s(qbit)
 
     def sdg(self, qbit: int):
-        self.state = npt.apply_one_qubit_gate(self.state, npt.SDG(), qbit)
+        self.sim_np.apply_one_qubit_gate(qbit,npt.SDG())
+        self.sim_sql.apply_one_qubit_gate(qbit,npt.SDG())
         self.qiskit_circ.sdg(qbit)
 
     def t(self, qbit: int):
-        self.state = npt.apply_one_qubit_gate(self.state, npt.T(), qbit)
+        self.sim_np.apply_one_qubit_gate(qbit,npt.T())
+        self.sim_sql.apply_one_qubit_gate(qbit,npt.T())
         self.qiskit_circ.t(qbit)
 
     def p(self, qbit: int, angle: float):
@@ -47,32 +56,38 @@ class QuantumSimulator:
             qbit (int): The number of the qbit we are applying the gate to
             angle (float): The phase shift angle in radians
         """
-        self.state = npt.apply_one_qubit_gate(self.state, npt.P(angle), qbit)
+        self.sim_np.apply_one_qubit_gate(qbit,npt.P(angle))
+        self.sim_sql.apply_one_qubit_gate(qbit,npt.P(angle))
         self.qiskit_circ.p(angle, qbit)
 
     def cnot(self, control: int, target: int):
-        print(self.state)
-        self.state = npt.apply_two_qubit_gate(self.state, npt.CNOT(), control, target)
+        self.sim_np.apply_two_qubit(control,target,npt.CNOT())
+        self.sim_sql.apply_two_qubit(control,target,npt.CNOT())
         self.qiskit_circ.cx(control, target)
 
     def ch(self, control: int, target: int):
-        self.state = npt.apply_two_qubit_gate(self.state, npt.CH(), control, target)
+        self.sim_np.apply_two_qubit(control,target,npt.CH())
+        self.sim_sql.apply_two_qubit(control,target,npt.CH())
         self.qiskit_circ.ch(control, target)
 
     def cx(self, control: int, target: int):
-        self.state = npt.apply_two_qubit_gate(self.state, npt.CX(), control, target)
+        self.sim_np.apply_two_qubit(control,target,npt.CX())
+        self.sim_sql.apply_two_qubit(control,target,npt.CX())
         self.qiskit_circ.cx(control, target)
 
     def cy(self, control: int, target: int):
-        self.state = npt.apply_two_qubit_gate(self.state, npt.CY(), control, target)
+        self.sim_np.apply_two_qubit(control,target,npt.CY())
+        self.sim_sql.apply_two_qubit(control,target,npt.CY())
         self.qiskit_circ.cy(control, target)
 
     def cz(self, control: int, target: int):
-        self.state = npt.apply_two_qubit_gate(self.state, npt.CZ(), control, target)
+        self.sim_np.apply_two_qubit(control,target,npt.CZ())
+        self.sim_sql.apply_two_qubit(control,target,npt.CZ())
         self.qiskit_circ.cz(control, target)
 
     def cs(self, control: int, target: int):
-        self.state = npt.apply_two_qubit_gate(self.state, npt.CS(), control, target)
+        self.sim_np.apply_two_qubit(control,target,npt.CS())
+        self.sim_sql.apply_two_qubit(control,target,npt.CS())
         self.qiskit_circ.cs(control, target)
 
     def ct(self, control: int, target: int):
@@ -92,7 +107,7 @@ class QuantumSimulator:
         self.qiskit_circ.ccx(control1,control2,target)
 
     def get_qiskit_statevector(self) -> Statevector:
-        circ = self.qiskit_circ.copy()
+        circ = self.qiskit_circ.copy().reverse_bits()
         circ.save_statevector()
         # Transpile for simulator
         simulator = AerSimulator(method="statevector")
@@ -108,7 +123,8 @@ class QuantumSimulator:
         return np.array(probs)
 
     def measure_own_probabilities(self) -> np.array:
-        out = np.array(self.state)
+        state=self.sim_sql.get_statevector()
+        out = np.array(state)
         out = np.around(np.abs(out.flatten()).__pow__(2), 5)
         return out
 
@@ -124,7 +140,8 @@ class QuantumSimulator:
         plt.show()
 
     def plot_own_probabilities(self):
-        npt.plot_nqbit_prob(self.state)
+        state=self.sim_sql.get_statevector()
+        npt.plot_nqbit_prob(state)
 
     def draw_qiskit_circuit(self):
         print(self.qiskit_circ.draw())
@@ -143,10 +160,25 @@ class QuantumSimulator:
         print("Qiskit:")
         print(qiskit)
         print(f"Conclusion: {result}")
+
+    def compare_own_times(self,justDiff=False,last=False):
+        if not justDiff:
+            print("NumPY times:")
+            print(self.sim_np.times)
+            print("SQL times:")
+            print(self.sim_sql.times)
+        n=sum(self.sim_np.times)
+        s=sum(self.sim_sql.times)
+        if s>n:
+            print("Diff:"+colored(s-n,"red"))
+        else:
+            print("Diff:"+colored(s-n,"green"))
+        if last:
+            print("LAST DIFF:"+str(self.sim_np.times[-1]-self.sim_sql.times[-1]))
             
 
     @classmethod
-    def setup_bell_state(cls, num_qubits: int) -> "QuantumSimulator":
+    def setup_bell_state(cls, num_qubits: int) -> "SimMPS":
         """
         Sets up a Bell state with the specified number of qubits.
 
@@ -171,7 +203,7 @@ class QuantumSimulator:
         return simulator
 
     @classmethod
-    def setup_ghz_state(cls, num_qubits: int) -> "QuantumSimulator":
+    def setup_ghz_state(cls, num_qubits: int) -> "SimMPS":
         """
         Sets up a GHZ state with the specified number of qubits.
 
@@ -196,7 +228,7 @@ class QuantumSimulator:
         return simulator
 
     @classmethod
-    def setup_phase_shift_example_state(cls) -> "QuantumSimulator":
+    def setup_phase_shift_example_state(cls) -> "SimMPS":
         simulator = cls(1)
         simulator.h(0)
         simulator.p(0, np.pi / 4)
@@ -206,14 +238,17 @@ class QuantumSimulator:
     
 if __name__ == "__main__":
     # # Create a Bell state with 2 qubits
-    bell_simulator = QuantumSimulator(3)
+    bell_simulator = SimMPS(3)
     bell_simulator.h(0)
     bell_simulator.h(1)
-    bell_simulator.ct(0,1)
-
-    # print(bell_simulator.state)
+    bell_simulator.cnot(0,1)
+    bell_simulator.cnot(1,2)
+    for i in range(1000):
+        bell_simulator.cy(0,1)
+    print(bell_simulator.sim_sql.tensors)
     # bell_simulator.draw_qiskit_circuit()
     bell_simulator.compare_results()
+    bell_simulator.compare_own_times(justDiff=True,last=True)
     # bell_simulator.plot_own_probabilities()
     # # q=QuantumSimulator(5)
     # simulator = QuantumSimulator.setup_phase_shift_example_state()
