@@ -208,6 +208,16 @@ class SimMPS:
             print("Diff:"+colored(s-n,"green"))
         if last:
             print("LAST DIFF:"+str(self.sim_np.times[-1]-self.sim_sql.times[-1]))
+    
+    def get_times(self):
+        return {'np':{
+                    'times':self.sim_np.times,
+                    'total':sum(self.sim_np.times)
+                },
+                'sql':{
+                    'times':self.sim_sql.times,
+                    'total':sum(self.sim_sql.times)
+                }}
 
     @staticmethod
     def run(num_qubits,gates):
