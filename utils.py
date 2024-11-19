@@ -5,13 +5,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from itertools import product
 
-INDICES = string.ascii_lowercase
-
-
-def contract_tensors(A, B): ...
-
-
-def outer_prod(v, u): ...
+INDICES = ""
+valid_characters = [(65, 65+26), (97, 97+26), (192, 214), (216, 246), (248, 328), (330, 383), (477, 687), (913, 974), (1024, 1119)]
+for tup in valid_characters:    
+    for i in range(tup[0], tup[1]):        
+        INDICES += chr(i)
 
 
 def init_state(n: int = 1, init_arr: List[float] = None) -> np.array:
@@ -248,7 +246,7 @@ def apply_three_qubit_gate(
     return np.einsum(einsum_str, state, gate)
 
 # PLOTS
-def plot_nqbit_prob(MPS: np.array):
+def plot_nqbit_prob_old(MPS: np.array):
     n = len(MPS.shape)
     prob_distr = np.abs(MPS).__pow__(2)
 
@@ -262,15 +260,52 @@ def plot_nqbit_prob(MPS: np.array):
     plt.ylim(0, 1)
     plt.show()
 
+def convert_to_einsum(num_qubits,gates):        
+    einsum_notation = ""        
+    current_out_index = [""]*num_qubits        
+    index_sizes = {}        
+    parameters = []
+
+    # start by giving each qubit a single letter        
+    for last_index in range(num_qubits):            
+        einsum_notation += INDICES[last_index] + ","            
+        current_out_index[last_index] = INDICES[last_index]            
+        index_sizes[INDICES[last_index]] = 2            
+        parameters.append("T0")        
+    
+    # now the gates are applied        
+    for gate in gates:            
+        last_index += 1            
+        match len(gate):               
+            case 3:                    
+                einsum_notation += INDICES[last_index:last_index+2] + current_out_index[gate[1]] + current_out_index[gate[2]] + ","                    
+                current_out_index[gate[1]] = INDICES[last_index]                    
+                current_out_index[gate[2]] = INDICES[last_index+1]                    
+                index_sizes[INDICES[last_index]] = 2                    
+                last_index += 1                
+            case 2:                    
+                einsum_notation += INDICES[last_index] + current_out_index[gate[1]] + ","                    
+                current_out_index[gate[1]] = INDICES[last_index]            
+        parameters.append(gate[0])            
+        index_sizes[INDICES[last_index]] = 2
+
+    einsum_notation = einsum_notation[:-1]                
+    
+    last_index += 1        
+    
+    einsum_notation += "->" +  "".join(current_out_index)        
+    return einsum_notation, index_sizes, parameters
+
 
 if __name__ == "__main__":
-    print(TOFFOLI())
-    # state = init_state(3)
-    # print(state)
-    # state = apply_one_qubit_gate(state, H(), 0)
-    # state = apply_one_qubit_gate(state, H(), 2)
-    # state = apply_two_qubit_gate(state, CY(), 0, 1)
-    print(CP(np.pi / 2))
+    # print(TOFFOLI())
+    # # state = init_state(3)
+    # # print(state)
+    # # state = apply_one_qubit_gate(state, H(), 0)
+    # # state = apply_one_qubit_gate(state, H(), 2)
+    # # state = apply_two_qubit_gate(state, CY(), 0, 1)
+    # print(CP(np.pi / 2))
 
-    x=np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,np.exp(np.pi/2)]])
-    print(x.reshape(2,2,2,2))
+    # x=np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,np.exp(np.pi/2)]])
+    # print(x.reshape(2,2,2,2))
+    print(INDICES)

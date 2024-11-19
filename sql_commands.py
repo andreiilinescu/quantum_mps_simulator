@@ -1,5 +1,4 @@
-
-
+#SQL COMMANDS FILE FROM THE EINSUM PAPER
 from string import Template, ascii_letters
 from itertools import product
 

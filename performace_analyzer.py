@@ -1,13 +1,18 @@
-from mpsSimulator import SimMPS
-def plot_time_diff(nr_iter, nr_qbits, gates):
-    sql_times=[]
-    np_times=[]
+from mps_simulator import MpsSimulator
+import numpy as np
+from db_contraction import duckdb_contraction
+from utils import convert_to_einsum
+
+def get_time_average(nr_iter, nr_qbits, gates,db_contraction=None):
+    times=np.empty(nr_iter)
     for i in range(nr_iter):
-       t=SimMPS.run(nr_qbits,gates).get_times()
-       sql_times.append(t['sql']['total'])
-       np_times.append(t['np']['total'])
-    print(sql_times)
+       tmp=MpsSimulator.run(nr_qbits,gates,db_contraction).get_times()
+       times[i]=tmp.mean()
+    return times
 
 
 if __name__ == "__main__":
-    plot_time_diff(10,2,[('h',0),('cnot',0,1)])
+    np.set_printoptions(suppress=True)
+    get_time_average(10,2,[('h',0),('cnot',0,1)])
+    get_time_average(10,2,[('h',0),('cnot',0,1)],duckdb_contraction)
+    print(convert_to_einsum(2,[('h',0),('cnot',0,1)]))
