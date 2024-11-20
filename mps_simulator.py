@@ -8,13 +8,13 @@ import matplotlib.pyplot as plt
 from termcolor import colored
 from mps import MPS
 from db_contraction import duckdb_contraction
-
+from simulator import Simulator
 MAX_BOND=10
-class MpsSimulator:
-    def __init__(self, qbits: int, db_contraction=None):
-        self.qbits = qbits
-        self.sim= MPS(qbits,max_bond=MAX_BOND ,db_contraction=db_contraction)
-        self.qiskit_circ = QuantumCircuit(qbits)
+class MpsSimulator(Simulator):
+    def __init__(self, num_qbits: int, db_contraction=None):
+        self.num_qbits = num_qbits
+        self.sim= MPS(num_qbits,max_bond=MAX_BOND ,db_contraction=db_contraction)
+        self.qiskit_circ = QuantumCircuit(num_qbits)
         self.gates=[]
 
     def h(self, qbit: int):
@@ -144,7 +144,7 @@ class MpsSimulator:
 
     def plot_qiskit_probabilities(self):
         probs = self.measure_qiskit_probablities()
-        n = self.qbits
+        n = self.num_qbits
         labels = [f"{i:0{n}b}" for i in range(2**n)]
         plt.bar(labels, probs, color="skyblue")
         plt.xlabel("Quantum States")
@@ -207,10 +207,10 @@ class MpsSimulator:
     
 if __name__ == "__main__":
     # # Create a Bell state with 2 qubits
-    simulator = MpsSimulator(2,duckdb_contraction)
-    simulator.h(0)  # Apply Hadamard gate to the first qubit
+    simulator = MpsSimulator(3,duckdb_contraction)
+    simulator.h(1)  # Apply Hadamard gate to the first qubit
     simulator.cnot(
-                0, 1
+                1, 2
             )  # Apply CNOT gate with qubit 0 as control and qubit 1 as target
 
     # Remaining qubits (if any) are left in the |0⟩ state
