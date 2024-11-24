@@ -7,12 +7,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from termcolor import colored
 from mps import MPS
-from db_contraction import duckdb_contraction
+from db_contraction import abstractDB,duckDB,sqliteDB
 from simulator import Simulator
 MAX_BOND=10
 class MpsSimulator(Simulator):
-    def __init__(self, num_qbits: int, db_contraction=None):
+    def __init__(self, num_qbits: int, db:abstractDB|None=None):
         self.num_qbits = num_qbits
+        db_contraction=None
+        if db is not None:
+            self.db:abstractDB=db()
+            db_contraction=self.db.contraction
         self.sim= MPS(num_qbits,max_bond=MAX_BOND ,db_contraction=db_contraction)
         self.qiskit_circ = QuantumCircuit(num_qbits)
         self.gates=[]
@@ -197,17 +201,18 @@ class MpsSimulator(Simulator):
         return np.array(self.sim.times)
 
     @staticmethod
-    def run(num_qubits,gates,db_contraction=None):
-        sim=MpsSimulator(num_qubits,db_contraction=db_contraction)
+    def run(num_qubits,gates,db=None):
+        sim=MpsSimulator(num_qubits,db=db)
         for x in gates:
             getattr(sim,x[0])(*x[1:])
-        
+        if db:
+            sim.db.close()
         return sim
     
     
 if __name__ == "__main__":
     # # Create a Bell state with 2 qubits
-    simulator = MpsSimulator(3,duckdb_contraction)
+    simulator = MpsSimulator(3,duckDB)
     simulator.h(1)  # Apply Hadamard gate to the first qubit
     simulator.cnot(
                 1, 2
