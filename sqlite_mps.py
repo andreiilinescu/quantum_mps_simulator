@@ -4,14 +4,16 @@ import numpy as np
 import json
 from svd_udf import SvdAggregator
 class SQL_MPS:
-      def __init__(self,qbits:int=2):
+      def __init__(self,qbits:int=2,gates:set|None=None):
             self.num_qbits=qbits
             self.conn = sqlite3.connect(":memory:")
             self.conn.create_aggregate("svd_agg", 8, SvdAggregator)
             self.conn.execute("CREATE TABLE tTemp (i INTEGER, j INTEGER, k INTEGER, l INTEGER, re REAL, im REAL)")
             self.conn.execute("CREATE TABLE tShape (qbit INTEGER, left INTEGER, right INTEGER)")
             self.conn.execute("CREATE TABLE tOut (i INTEGER, j INTEGER, k INTEGER, re REAL, im REAL)")
-            self.gates=['H','X','Y','CNOT']
+            if gates is None:
+                  gates={'H','X','Y','CNOT'}
+            self.gates=gates
             self.initialize_db()
             self.init_gates()
 
@@ -81,13 +83,28 @@ class SQL_MPS:
             self.conn.execute(f"DELETE  FROM   tTemp;")
             self.conn.commit()
             #how to reshape matrix once this is done 2 by m where 2*m is the total dimension
+
       def check_db(self):
             for i in range(self.num_qbits):
                   res=self.conn.execute(f"SELECT * FROM t{i}").fetchall()
                   print(res)
             res=self.conn.execute(f"SELECT * FROM tTemp").fetchall()
             print(res)
-      
+
+      @staticmethod
+      def run_circuit_json(path) -> 'SQL_MPS':
+            file=open(path)
+            data=json.load(file)
+            num_qubits = data["number_of_qubits"]
+            gates_data =data["gates"]
+            gates =  {x['gate'] for x in gates_data}
+            sim=SQL_MPS(num_qubits,gates)
+            for x in gates_data:
+                  if len(x['qubits'])==1:
+                        sim.apply_one_qbit_gate(x['qubits'][0],x['gate'])
+                  elif len(x['qubits'])==2:
+                        sim.apply_two_qbit_gate(x['qubits'][0],x['gate'])
+            return sim
       # def get_statevector(self):
       #       self.conn.execute("INSERT  INTO tOut (i,j,k,l,re,im) SELECT * FROM t{0}")
       #       for i in range(1,self.num_qbits):
@@ -96,10 +113,6 @@ class SQL_MPS:
       #                               INSERT  INTO tTemp (i,j,k,l,re,im)""")
            
 
-s=SQL_MPS(2)
-s.apply_one_qbit_gate(0,'H')
 
-s.apply_two_qbit_gate(0,"CNOT")
-
-s.apply_two_qbit_gate(0,"CNOT")
-s.check_db()
+t=SQL_MPS.run_circuit_json("./circuits/example.json")
+t.check_db()
