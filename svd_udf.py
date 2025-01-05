@@ -32,13 +32,14 @@ class SvdAggregator:
             return None
         l=self.l
         r=self.r
-        rows=np.zeros(2*l)
-        cols=np.zeros(2*r)
+        rows=np.zeros(min(2*l,2*r))
+        cols=np.zeros(min(2*l,2*r))
 
         for i in range(len(self.values)):
             rows[i]=2*self.ti[i]+self.tj[i]
             cols[i]=r*self.tk[i]+self.tl[i]
         # Construct the sparse matrix
+
         try:
             M = coo_matrix(
                 (self.values, (rows, cols)),

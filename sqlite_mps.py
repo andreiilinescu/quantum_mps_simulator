@@ -53,8 +53,6 @@ class SQL_MPS:
                                     SELECT A.i as i, B.k as j, B.l as k, A.l as l, SUM(B.re * A.re - B.im * A.im) AS re, SUM(B.re * A.im + B.im * A.re) AS im
                                     FROM cont as A JOIN t{gate} as  B on A.j=B.i AND A.k=B.j GROUP BY A.i, B.k, B.l, A.l HAVING SUM(B.re * A.re - B.im * A.im)!=0 OR SUM(B.re * A.im + B.im * A.re)!=0  ORDER BY i,j,k,l  
                                           """).fetchall()
-            self.check_db()
-            print("\n")
             #clear tables
             self.conn.execute(f"DELETE  FROM   t{first_qbit};")
             self.conn.execute(f"DELETE  FROM   t{first_qbit+1};")
@@ -100,11 +98,14 @@ class SQL_MPS:
             gates =  {x['gate'] for x in gates_data}
             sim=SQL_MPS(num_qubits,gates)
             for x in gates_data:
+                  # sim.check_db()
+                  # print("\n")
                   if len(x['qubits'])==1:
                         sim.apply_one_qbit_gate(x['qubits'][0],x['gate'])
                   elif len(x['qubits'])==2:
                         sim.apply_two_qbit_gate(x['qubits'][0],x['gate'])
             return sim
+      
       # def get_statevector(self):
       #       self.conn.execute("INSERT  INTO tOut (i,j,k,l,re,im) SELECT * FROM t{0}")
       #       for i in range(1,self.num_qbits):
@@ -115,4 +116,4 @@ class SQL_MPS:
 
 
 t=SQL_MPS.run_circuit_json("./circuits/example.json")
-t.check_db()
+# t.check_db()
