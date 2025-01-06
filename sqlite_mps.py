@@ -112,8 +112,22 @@ class SQL_MPS:
       #             self.conn.execute(f"""WITH temp AS (SELECT A.i as i, A.j as j, B.j as k, B.k as l, SUM(B.re * A.re - B.im * A.im) AS re, SUM(B.re * A.im + B.im * A.re) AS im 
       #                                     FROM tOut as A JOIN  t{i} B ON A.k= B.i GROUP BY A.i,A.j,B.j,B.k ORDER BY i,j,k,l)
       #                               INSERT  INTO tTemp (i,j,k,l,re,im)""")
-           
+      def get_statevector_np(self):
+            s=self.conn.execute("SELECT * FROM tShape").fetchall()
+            tensors=[np.zeros((x[1],2,x[2]),dtype=np.complex128) for x in s]
+            for i in range(self.num_qbits):
+                  res=self.conn.execute(f"SELECT * FROM t{i}").fetchall()
+                  for x in res:
+                        tensors[i][x[0:3]]=x[3]+x[4]*1j
+
+            tensor = tensors[0]
+            for i in range(1, self.num_qbits):
+                  tensor = np.tensordot(tensor, tensors[i], axes=([-1], [0]))
+            tensor = tensor.reshape(-1)
+            return tensor
 
 
 t=SQL_MPS.run_circuit_json("./circuits/example.json")
+x=t.get_statevector_np()
+print(x)
 # t.check_db()
