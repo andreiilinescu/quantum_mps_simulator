@@ -28,8 +28,9 @@ class sqliteDB(abstractDB):
         self.conn=sqlite3.connect(':memory:')
 
     def contraction(self,str:str):
-        res=self.conn.cursor().execute(str).fetchall()
-        return res 
+        res=self.conn.cursor().execute(str)
+        self.conn.commit()
+        return res.fetchall()
     
     def close(self):
         self.conn.close()

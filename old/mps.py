@@ -2,7 +2,7 @@ import numpy as np
 import utils as npt
 import sql_commands as sqlc
 from timeit import default_timer as timer
-
+from db_contraction import duckDB
 class MPS:
     def __init__(self, qbits: int,max_bond:int =5, use_timer: bool=True ,db_contraction=None):
         self.num_qubits = qbits
@@ -37,6 +37,7 @@ class MPS:
     
     def _one_sql_contraction(self,qubit:int ,gate:np.ndarray):
         query=sqlc.sql_einsum_query("ijk,jl->ilk",['A','B'],{'A':self.tensors[qubit],'B':gate},complex=True)
+        print(query)
         result=self.db_contraction(query)
         self.tensors[qubit]=np.zeros(self.tensors[qubit].shape,dtype=np.complex128)
         for x in result:
@@ -44,6 +45,7 @@ class MPS:
     
     def _two_sql_contraction(self, tensor:np.ndarray, gate:np.ndarray):
         query=sqlc.sql_einsum_query("eabh,abcd->ecdh",['A','B'],{'A':tensor,'B':gate},complex=True)
+        print(query)
         result=self.db_contraction(query)
         tensor=np.zeros(tensor.shape,dtype=np.complex128)
         for x in result:
@@ -72,7 +74,6 @@ class MPS:
         t2=self.tensors[qubit_two]
         l=t1.shape[0]
         r=t2.shape[2]
-
         #contract tensors into one big tensor
         try:
             t=np.tensordot(t1, t2, axes=([-1], [0]))
@@ -87,11 +88,8 @@ class MPS:
         if self.use_timer:
             time=toc-tic
             self.times.append(time)
-                
-
         #perform SVD
         t=t.reshape(l*2, r*2)
-        
         U, S, Vh = np.linalg.svd(t, full_matrices=False)
 
         #Truncate SVD
@@ -103,7 +101,7 @@ class MPS:
 
 
         U=U.reshape(l,2,int(U.size//l//2))
-        
+       
         Vh = S @ Vh
         Vh=Vh.reshape(int(Vh.size//r//2),2,r)
 
@@ -154,13 +152,10 @@ class MPS:
 
 
 if __name__ == "__main__":
-    m = MPS(2,max_bond=5)
+    m = MPS(3,max_bond=5)
     m.apply_one_qubit_gate(0,npt.H())
     m.apply_two_qubit(0,1,npt.CNOT())
-    m.apply_two_qubit(0,1,npt.CY())
+    m.apply_two_qubit(1,2,npt.CNOT())
 
-    print("\n")
-    for x in m.tensors:
-        print(x.shape)
     print(m.get_statevector())
     

@@ -1,0 +1,1 @@
+t.check_db()

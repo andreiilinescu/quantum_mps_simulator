@@ -46,16 +46,16 @@ def run_multiple_ghz(max_qbits,simulator_method:Simulator=MpsSimulator,db:abstra
         medians.append(med)
     return medians
  
-NR_QBITS=10
+NR_QBITS=20
 if __name__ == "__main__":
     # print(get_memory_medians(50,10,generate_ghz_gates(10),MpsSimulator))
     np.set_printoptions(suppress=True)
     x=np.array(range(2,NR_QBITS+1))
-    y1=run_multiple_ghz(NR_QBITS,OneQuerySimulator,duckDB)
+    # y1=run_multiple_ghz(NR_QBITS,OneQuerySimulator,duckDB)
     y2=run_multiple_ghz(NR_QBITS,OneQuerySimulator,sqliteDB)
     label1="OneQuerySimulator, duckDB"
     label2="OneQuerySimulator, sqliteDB"
-    plot_multiple_lines(x,[y1,y2],[label1,label2],"Number of Qbits","Time (s)","GHZ State Time Comparison using SQLITE")
+    plot_multiple_lines(x,[y2],[label2],"Number of Qbits","Time (s)","GHZ State Time Comparison using SQLITE")
     # t=get_time_medians(100,2,[('h',0),('cnot',0,1)],db_contraction=duckdb_contraction)
     # t2=get_time_medians(100,2,[('h',0),('cnot',0,1)],simulator_method=OneQuerySimulator.run,db_contraction=duckdb_contraction)
     # print("mps")

@@ -1,4 +1,4 @@
-import utils
+import utils as utils
 import plotting
 from qiskit import QuantumCircuit, transpile
 from qiskit_aer import Aer, AerSimulator

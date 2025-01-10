@@ -3,7 +3,7 @@ from sql_commands import sql_einsum_query
 from db_contraction import abstractDB,duckdb,sqlite3
 from simulator import Simulator
 import numpy as np
-import utils
+import utils as utils
 from timeit import default_timer as timer
 
 class OneQuerySimulator(Simulator):

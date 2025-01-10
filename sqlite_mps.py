@@ -1,18 +1,17 @@
 import sqlite3
-import utils
+import gates as gates
 import numpy as np
 import json
+from timeit import default_timer as timer
 from svd_udf import SvdAggregator
 class SQL_MPS:
-      def __init__(self,qbits:int=2,gates:set|None=None):
+      def __init__(self,qbits:int,gates:set):
             self.num_qbits=qbits
             self.conn = sqlite3.connect(":memory:")
             self.conn.create_aggregate("svd_agg", 8, SvdAggregator)
             self.conn.execute("CREATE TABLE tTemp (i INTEGER, j INTEGER, k INTEGER, l INTEGER, re REAL, im REAL)")
             self.conn.execute("CREATE TABLE tShape (qbit INTEGER, left INTEGER, right INTEGER)")
             self.conn.execute("CREATE TABLE tOut (i INTEGER, j INTEGER, k INTEGER, re REAL, im REAL)")
-            if gates is None:
-                  gates={'H','X','Y','CNOT'}
             self.gates=gates
             self.initialize_db()
             self.init_gates()
@@ -25,15 +24,15 @@ class SQL_MPS:
       
       def init_gates(self):
             for x in self.gates:
-                  gate:np.ndarray=getattr(utils,x)()
+                  gate:np.ndarray=getattr(gates,x)()
                   if len(gate.shape)==2:
                         self.conn.execute(f"CREATE TABLE t{x} (i INTEGER, j INTEGER, re REAL, im REAL)")
-                        gate:np.ndarray=getattr(utils,x)()
+                        gate:np.ndarray=getattr(gates,x)()
                         for idx,z in np.ndenumerate(gate):
                               self.conn.execute(f"INSERT INTO t{x} (i, j, re,im) VALUES ({idx[0]},{idx[1]} , {z.real}, {z.imag})")
                   elif len(gate.shape)==4:
                         self.conn.execute(f"CREATE TABLE t{x} (i INTEGER, j INTEGER, k INTEGER, l INTEGER, re REAL, im REAL)")
-                        gate:np.ndarray=getattr(utils,x)()
+                        gate:np.ndarray=getattr(gates,x)()
                         for idx,z in np.ndenumerate(gate):
                               self.conn.execute(f"INSERT INTO t{x} (i, j,k,l, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]},{idx[3]} , {z.real}, {z.imag})")
       
@@ -90,16 +89,12 @@ class SQL_MPS:
             print(res)
 
       @staticmethod
-      def run_circuit_json(path) -> 'SQL_MPS':
-            file=open(path)
-            data=json.load(file)
+      def run_circuit_json(data) -> 'SQL_MPS':
             num_qubits = data["number_of_qubits"]
             gates_data =data["gates"]
             gates =  {x['gate'] for x in gates_data}
             sim=SQL_MPS(num_qubits,gates)
             for x in gates_data:
-                  # sim.check_db()
-                  # print("\n")
                   if len(x['qubits'])==1:
                         sim.apply_one_qbit_gate(x['qubits'][0],x['gate'])
                   elif len(x['qubits'])==2:
@@ -126,8 +121,11 @@ class SQL_MPS:
             tensor = tensor.reshape(-1)
             return tensor
 
-
-t=SQL_MPS.run_circuit_json("./circuits/example.json")
+file=open("./circuits/example.json")
+data=json.load(file)
+tic=timer()
+t=SQL_MPS.run_circuit_json(data)
+toc=timer()
 x=t.get_statevector_np()
-print(x)
+print(toc-tic)
 # t.check_db()
