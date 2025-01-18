@@ -17,10 +17,10 @@ def plot_statevector(MPS: np.ndarray):
     plt.ylim(0, 1)
     plt.show()
 
-def plot_multiple_lines(x:np.ndarray,ys,labels, x_axis_label:str='X-axis',y_axis_label:str='Y-axis',title:str='Multiple Lines Connecting Scatter Points'):
+def plot_multiple_lines(num_qubits,ys,labels, x_axis_label:str='X-axis',y_axis_label:str='Y-axis',title:str='Multiple Lines Connecting Scatter Points'):
     if len(ys) != len(labels):
         raise ValueError("The number of lines (rows in ys) must match the number of labels.")
-    
+    x=list(range(2,num_qubits+1))
     for y, label in zip(ys, labels):
         if len(x) != len(y):
             raise ValueError(f"x and y must have the same length. Found {len(x)} and {len(y)} for label '{label}'.")
@@ -33,3 +33,5 @@ def plot_multiple_lines(x:np.ndarray,ys,labels, x_axis_label:str='X-axis',y_axis
     plt.legend()
     plt.grid(True)
     plt.show()
+
+

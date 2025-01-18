@@ -3,16 +3,22 @@ import gates as gates
 import numpy as np
 import json
 from timeit import default_timer as timer
-from svd_udf import SvdAggregator
-class SQL_MPS:
+from svd_udf_py import SvdAggregator
+CPP=False
+class SQLITE_MPS:
       def __init__(self,qbits:int,gates:set):
             self.num_qbits=qbits
             self.conn = sqlite3.connect(":memory:")
-            self.conn.create_aggregate("svd_agg", 8, SvdAggregator)
+            if CPP:
+                  self.conn.enable_load_extension(True)
+                  self.conn.load_extension("./svd_udf.so")
+            else:
+                  self.conn.create_aggregate("svd_agg", 8, SvdAggregator)
             self.conn.execute("CREATE TABLE tTemp (i INTEGER, j INTEGER, k INTEGER, l INTEGER, re REAL, im REAL)")
             self.conn.execute("CREATE TABLE tShape (qbit INTEGER, left INTEGER, right INTEGER)")
             self.conn.execute("CREATE TABLE tOut (i INTEGER, j INTEGER, k INTEGER, re REAL, im REAL)")
             self.gates=gates
+            self.times=[]
             self.initialize_db()
             self.init_gates()
 
@@ -89,16 +95,19 @@ class SQL_MPS:
             print(res)
 
       @staticmethod
-      def run_circuit_json(data) -> 'SQL_MPS':
+      def run_circuit_json(data) -> 'SQLITE_MPS':
             num_qubits = data["number_of_qubits"]
             gates_data =data["gates"]
             gates =  {x['gate'] for x in gates_data}
-            sim=SQL_MPS(num_qubits,gates)
+            sim=SQLITE_MPS(num_qubits,gates)
             for x in gates_data:
+                  tic=timer()
                   if len(x['qubits'])==1:
                         sim.apply_one_qbit_gate(x['qubits'][0],x['gate'])
                   elif len(x['qubits'])==2:
                         sim.apply_two_qbit_gate(x['qubits'][0],x['gate'])
+                  toc=timer()
+                  sim.times.append(toc-tic)
             return sim
       
       # def get_statevector(self):
@@ -120,12 +129,15 @@ class SQL_MPS:
                   tensor = np.tensordot(tensor, tensors[i], axes=([-1], [0]))
             tensor = tensor.reshape(-1)
             return tensor
+      
+      def get_times(self):
+            return self.times
 
-file=open("./circuits/example.json")
-data=json.load(file)
-tic=timer()
-t=SQL_MPS.run_circuit_json(data)
-toc=timer()
-x=t.get_statevector_np()
-print(toc-tic)
-# t.check_db()
+if __name__ == "__main__":
+      file=open("./circuits/example.json")
+      data=json.load(file)
+      tic=timer()
+      t=SQLITE_MPS.run_circuit_json(data)
+      toc=timer()
+      x=t.get_statevector_np()
+      # print(toc-tic)
