@@ -26,7 +26,7 @@ def get_medians(data:dict):
     out={}
     for i in range(2,n+1):
         tmp=times[str(i)]
-        out[i]=np.median(tmp)
+        out[str(i)]=np.median(tmp)
     return out
 
 def save_data_to_file(data,filename:str):
@@ -39,7 +39,9 @@ def save_data_to_file(data,filename:str):
     
 
 if __name__ =="__main__":
-    file=open("data/ghz_100_10_sum.json")
+    file = open("./data/ghz_100_50_median.json")
     data=json.load(file)
-    med=get_medians(data)
-    plot_multiple_lines(data["max_qubits"],[list(med.values())],["sqlite_mps"],"Number of Qubits","Time (s)")
+    file=open("./data/ghz_hybrid_100_50_median.json")
+    data2=json.load(file)
+    # med=get_medians(data)
+    plot_multiple_lines(data["max_qubits"],[list(data["times"].values()),list(data2["times"].values())],["sqlite_mps","hybrid_mps"],"Number of Qubits","Time (s)","Sqlite MPS VS Hybrid MPS")

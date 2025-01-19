@@ -50,7 +50,6 @@ class QuantumSimulator:
         self.qiskit_circ.p(angle, qbit)
 
     def cnot(self, control: int, target: int):
-        print(self.state)
         self.state = npt.apply_two_qubit_gate(self.state, npt.CNOT(), control, target)
         self.qiskit_circ.cx(control, target)
 

@@ -1,1 +1,0 @@
-t.check_db()

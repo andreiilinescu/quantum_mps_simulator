@@ -37,7 +37,6 @@ class MPS:
     
     def _one_sql_contraction(self,qubit:int ,gate:np.ndarray):
         query=sqlc.sql_einsum_query("ijk,jl->ilk",['A','B'],{'A':self.tensors[qubit],'B':gate},complex=True)
-        print(query)
         result=self.db_contraction(query)
         self.tensors[qubit]=np.zeros(self.tensors[qubit].shape,dtype=np.complex128)
         for x in result:
@@ -45,7 +44,6 @@ class MPS:
     
     def _two_sql_contraction(self, tensor:np.ndarray, gate:np.ndarray):
         query=sqlc.sql_einsum_query("eabh,abcd->ecdh",['A','B'],{'A':tensor,'B':gate},complex=True)
-        print(query)
         result=self.db_contraction(query)
         tensor=np.zeros(tensor.shape,dtype=np.complex128)
         for x in result:
