@@ -19,6 +19,7 @@ class SQLITE_MPS:
             self.conn.execute("CREATE TABLE tShape (qbit INTEGER, left INTEGER, right INTEGER)")
             self.conn.execute("CREATE TABLE tOut (i INTEGER, j INTEGER, k INTEGER, re REAL, im REAL)")
             self.gates=gates
+            gates.add("SWAP")
             self.times=[]
             self.initialize_db()
             self.init_gates()
@@ -52,21 +53,31 @@ class SQLITE_MPS:
             toc= timer()
             print(toc-tic)
 
-      def apply_two_qbit_gate(self,first_qbit:int,gate:str):
+      def apply_two_qbit_gate(self,first_qbit:int,second_qubit:int,gate:str):
+            if(first_qbit>second_qubit):
+                  first_qbit,second_qubit=second_qubit,first_qbit
+            path=[]
+            for q in range(second_qubit, first_qbit+1, -1):
+                path.append((q - 1, q))
             #contraction
-           
-            res=self.conn.execute(f"""
+            for q1, q2 in path:
+                    self._two_qubit_contraction(q1, q2, "SWAP")
+            self._two_qubit_contraction(first_qbit,first_qbit+1,gate)
+            for q1, q2 in reversed(path):
+                    self._two_qubit_contraction(q1, q2, "SWAP")
+      def _two_qubit_contraction(self,first_qbit:int,second_qubit:int,gate:str):
+            self.conn.execute(f"""
                                     WITH cont AS (SELECT A.i as i, A.j as j, B.j as k, B.k as l, SUM(B.re * A.re - B.im * A.im) AS re, SUM(B.re * A.im + B.im * A.re) AS im 
-                                          FROM t{first_qbit} as A JOIN  t{first_qbit+1} B ON A.k= B.i GROUP BY A.i,A.j,B.j,B.k ORDER BY i,j,k,l)
+                                          FROM t{first_qbit} as A JOIN  t{second_qubit} B ON A.k= B.i GROUP BY A.i,A.j,B.j,B.k ORDER BY i,j,k,l)
                                     INSERT  INTO tTemp (i,j,k,l,re,im) 
                                     SELECT A.i as i, B.k as j, B.l as k, A.l as l, SUM(B.re * A.re - B.im * A.im) AS re, SUM(B.re * A.im + B.im * A.re) AS im
                                     FROM cont as A JOIN t{gate} as  B on A.j=B.i AND A.k=B.j GROUP BY A.i, B.k, B.l, A.l HAVING SUM(B.re * A.re - B.im * A.im)!=0 OR SUM(B.re * A.im + B.im * A.re)!=0  ORDER BY i,j,k,l  
-                                          """).fetchall()
+                                          """)
             #clear tables
             self.conn.execute(f"DELETE  FROM   t{first_qbit};")
-            self.conn.execute(f"DELETE  FROM   t{first_qbit+1};")
+            self.conn.execute(f"DELETE  FROM   t{second_qubit};")
             cursor = self.conn.execute(f"""
-                  SELECT svd_agg(i,j,k,l,re,im, (SELECT "left"  FROM tShape WHERE qbit = {first_qbit}),(SELECT "right" FROM tShape WHERE qbit = {first_qbit+1}))
+                  SELECT svd_agg(i,j,k,l,re,im, (SELECT "left"  FROM tShape WHERE qbit = {first_qbit}),(SELECT "right" FROM tShape WHERE qbit = {second_qubit}))
                   FROM tTemp
                   """)
             result_json = json.loads(cursor.fetchone()[0])
@@ -81,14 +92,13 @@ class SQLITE_MPS:
             for idx, v in np.ndenumerate(v_re):
                   v2=v_im[idx]
                   if v !=0.0 or v2!=0.0:
-                        self.conn.execute(f"INSERT INTO t{first_qbit+1} (i, j,k, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]} , {v}, {v2})")
+                        self.conn.execute(f"INSERT INTO t{second_qubit} (i, j,k, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]} , {v}, {v2})")
 
             sh=result_json["sh"]
             self.conn.execute(f"UPDATE tShape SET left={sh[0][0]}, right={sh[0][1]} WHERE qbit={first_qbit}")
-            self.conn.execute(f"UPDATE tShape SET left={sh[1][0]}, right={sh[1][1]} WHERE qbit={first_qbit+1}")
+            self.conn.execute(f"UPDATE tShape SET left={sh[1][0]}, right={sh[1][1]} WHERE qbit={second_qubit}")
 
             self.conn.execute(f"DELETE  FROM   tTemp;")
-            self.conn.commit()
             #how to reshape matrix once this is done 2 by m where 2*m is the total dimension
 
       def check_db(self):
@@ -125,7 +135,7 @@ class SQLITE_MPS:
                   if len(x['qubits'])==1:
                         sim.apply_one_qbit_gate(x['qubits'][0],x['gate'])
                   elif len(x['qubits'])==2:
-                        sim.apply_two_qbit_gate(x['qubits'][0],x['gate'])
+                        sim.apply_two_qbit_gate(x['qubits'][0],x['qubits'][1],x['gate'])
                   toc=timer()
                   sim.times.append(toc-tic)
             sim.save_state_tables()
@@ -157,8 +167,14 @@ class SQLITE_MPS:
 if __name__ == "__main__":
       file=open("./circuits/example.json")
       data=json.load(file)
+      t=SQLITE_MPS(3,{"H","CNOT"})
       tic=timer()
       t=SQLITE_MPS.run_circuit_json(data)
+      t.check_db()
+      # print("\n\n")
+      # t.apply_one_qbit_gate(0,"H")
+      # t.apply_two_qbit_gate(0,1,"CNOT")
+      # t.apply_two_qbit_gate(1,2,"CNOT")
       toc=timer()
       x=t.get_statevector_np()
       # print(toc-tic)
