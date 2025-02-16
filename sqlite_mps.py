@@ -2,6 +2,7 @@ import sqlite3
 import gates as gates
 import numpy as np
 import json
+import pandas as pd
 from timeit import default_timer as timer
 from svd_udf_py import SvdAggregator
 CPP=False
@@ -43,10 +44,13 @@ class SQLITE_MPS:
                               self.conn.execute(f"INSERT INTO t{x} (i, j,k,l, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]},{idx[3]} , {z.real}, {z.imag})")
       
       def apply_one_qbit_gate(self,qbit:int,gate:str):
+            tic=timer()
             res=self.conn.execute(f"""SELECT qb.i as i, gate.j as j, qb.k as k, SUM(gate.re * qb.re - gate.im * qb.im) AS re, SUM(gate.re * qb.im + gate.im * qb.re) AS im 
                                  FROM t{qbit} as qb JOIN  t{gate} gate ON qb.j= gate.i GROUP BY qb.i,gate.j,qb.k ORDER BY i,j,k""").fetchall()
             self.conn.execute(f"DELETE  FROM   t{qbit};")
             self.conn.executemany(f"INSERT INTO t{qbit} (i,j,k,re,im) VALUES (?,?,?,?,?)",res)
+            toc= timer()
+            print(toc-tic)
 
       def apply_two_qbit_gate(self,first_qbit:int,gate:str):
             #contraction
@@ -61,10 +65,10 @@ class SQLITE_MPS:
             #clear tables
             self.conn.execute(f"DELETE  FROM   t{first_qbit};")
             self.conn.execute(f"DELETE  FROM   t{first_qbit+1};")
-            l=self.conn.execute(f"SELECT left from tShape WHERE qbit={first_qbit}").fetchone()[0]
-            r=self.conn.execute(f"SELECT right from tShape WHERE qbit={first_qbit+1}").fetchone()[0]
-            #svd
-            cursor = self.conn.execute(f"SELECT svd_agg(i, j, k, l, re, im, {l}, {r}) FROM tTemp")
+            cursor = self.conn.execute(f"""
+                  SELECT svd_agg(i,j,k,l,re,im, (SELECT "left"  FROM tShape WHERE qbit = {first_qbit}),(SELECT "right" FROM tShape WHERE qbit = {first_qbit+1}))
+                  FROM tTemp
+                  """)
             result_json = json.loads(cursor.fetchone()[0])
             u_re=np.array(result_json["U_re"])
             u_im=np.array(result_json["U_im"])
@@ -94,6 +98,21 @@ class SQLITE_MPS:
             res=self.conn.execute(f"SELECT * FROM tTemp").fetchall()
             print(res)
 
+      def save_state_tables(self):
+            out=[]
+            for i in range(self.num_qbits):
+                  df = pd.read_sql_query(f"SELECT * FROM t{i};", self.conn)
+                  print(f"t{i}")
+                  out.append(df)
+            return out
+      
+      def cleanup(self):
+            for i in range(self.num_qbits):
+                  self.conn.execute(f"DROP TABLE [IF EXISTS] t{i};")
+            self.conn.execute("DROP TABLE [IF EXISTS] tShape;")
+            self.conn.execute("DROP TABLE [IF EXISTS] tOut;")
+            self.conn.execute("DROP TABLE [IF EXISTS] tTemp;")
+
       @staticmethod
       def run_circuit_json(data) -> 'SQLITE_MPS':
             num_qubits = data["number_of_qubits"]
@@ -102,12 +121,14 @@ class SQLITE_MPS:
             sim=SQLITE_MPS(num_qubits,gates)
             for x in gates_data:
                   tic=timer()
+                  sim.save_state_tables()
                   if len(x['qubits'])==1:
                         sim.apply_one_qbit_gate(x['qubits'][0],x['gate'])
                   elif len(x['qubits'])==2:
                         sim.apply_two_qbit_gate(x['qubits'][0],x['gate'])
                   toc=timer()
                   sim.times.append(toc-tic)
+            sim.save_state_tables()
             return sim
       
       # def get_statevector(self):
@@ -141,3 +162,8 @@ if __name__ == "__main__":
       toc=timer()
       x=t.get_statevector_np()
       # print(toc-tic)
+      print(t.get_statevector_np())
+
+      for g in t.gates:
+            df = pd.read_sql_query(f"SELECT * FROM t{g};", t.conn)
+            print(f"t{g}")

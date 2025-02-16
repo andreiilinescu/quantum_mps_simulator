@@ -38,12 +38,14 @@ def generate_ghz_gates(nr_qbits):
 
 NR_ITERS=50
 def run_multiple_ghz(max_qbits,simulator_method:Simulator=MpsSimulator,db:abstractDB=None, tracker=get_time_medians):
+    print("Running multiple ghz state circuits")
     medians=[]
     for num_qbits in range(2,max_qbits+1):
         gates=generate_ghz_gates(num_qbits)
         times=tracker(NR_ITERS,num_qbits,gates,simulator=simulator_method,db=db)
         med=np.mean(times)
         medians.append(med)
+    print("Finished running circuits")
     return medians
 
 def save_data_to_file(data,filename:str):
@@ -52,7 +54,7 @@ def save_data_to_file(data,filename:str):
     with open("./data/"+filename, 'w') as f:
         json.dump(data, f)
 
-NR_QBITS=100
+NR_QBITS=20
 if __name__ == "__main__":
     # print(get_memory_medians(50,10,generate_ghz_gates(10),MpsSimulator))
     np.set_printoptions(suppress=True)

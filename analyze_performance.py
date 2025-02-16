@@ -39,9 +39,10 @@ def save_data_to_file(data,filename:str):
     
 
 if __name__ =="__main__":
-    file = open("./data/ghz_100_50_median.json")
+    file = open("./data/ghz_20_100_sum.json")
     data=json.load(file)
-    file=open("./data/ghz_hybrid_100_50_median.json")
+    file=open("./data/ghz_hybrid_20_50_median.json")
     data2=json.load(file)
-    # med=get_medians(data)
+    med=get_medians(data)
+    data["times"]=med
     plot_multiple_lines(data["max_qubits"],[list(data["times"].values()),list(data2["times"].values())],["sqlite_mps","hybrid_mps"],"Number of Qubits","Time (s)","Sqlite MPS VS Hybrid MPS")

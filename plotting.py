@@ -18,8 +18,7 @@ def plot_statevector(MPS: np.ndarray):
     plt.show()
 
 def plot_multiple_lines(num_qubits,ys,labels, x_axis_label:str='X-axis',y_axis_label:str='Y-axis',title:str='Multiple Lines Connecting Scatter Points'):
-    if len(ys) != len(labels):
-        raise ValueError("The number of lines (rows in ys) must match the number of labels.")
+
     x=list(range(2,num_qubits+1))
     for y, label in zip(ys, labels):
         if len(x) != len(y):

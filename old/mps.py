@@ -65,6 +65,8 @@ class MPS:
 
     def apply_two_qubit(self,qubit_one:int,qubit_two:int,gate):
         """Apply two qubit gate"""
+        tic=timer()
+
         if qubit_one >= len(self.tensors) or qubit_two>=len(self.tensors):
             raise ValueError("qubit number too large")
 
@@ -80,12 +82,7 @@ class MPS:
             print(t2.shape)
 
         #perform gate contraction
-        tic=timer()
         t=self._two_contraction(t,gate)
-        toc=timer()
-        if self.use_timer:
-            time=toc-tic
-            self.times.append(time)
         #perform SVD
         t=t.reshape(l*2, r*2)
         U, S, Vh = np.linalg.svd(t, full_matrices=False)
@@ -105,6 +102,11 @@ class MPS:
 
         self.tensors[qubit_one]=U
         self.tensors[qubit_two]=Vh
+
+        toc=timer()
+        if self.use_timer:
+            time=toc-tic
+            self.times.append(time)
 
     @staticmethod
     def statevector_to_mps(state_vector: list):
