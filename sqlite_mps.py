@@ -6,43 +6,59 @@ import pandas as pd
 from timeit import default_timer as timer
 from svd_udf_py import SvdAggregator
 CPP=False
+PARAMETER_ACC=4
 class SQLITE_MPS:
-      def __init__(self,qbits:int,gates:set):
+      def __init__(self,qbits:int,gates:dict):
             self.num_qbits=qbits
+            self.times=[]
             self.conn = sqlite3.connect(":memory:")
             if CPP:
                   self.conn.enable_load_extension(True)
                   self.conn.load_extension("./svd_udf.so")
             else:
                   self.conn.create_aggregate("svd_agg", 8, SvdAggregator)
-            self.conn.execute("CREATE TABLE tTemp (i INTEGER, j INTEGER, k INTEGER, l INTEGER, re REAL, im REAL)")
-            self.conn.execute("CREATE TABLE tShape (qbit INTEGER, left INTEGER, right INTEGER)")
-            self.conn.execute("CREATE TABLE tOut (i INTEGER, j INTEGER, k INTEGER, re REAL, im REAL)")
+
+            gates["SWAP"]=None
             self.gates=gates
-            gates.add("SWAP")
-            self.times=[]
+            
+
             self.initialize_db()
             self.init_gates()
 
       def initialize_db(self):   
+            self.conn.execute("CREATE TABLE tTemp (i INTEGER, j INTEGER, k INTEGER, l INTEGER, re REAL, im REAL)")
+            self.conn.execute("CREATE TABLE tShape (qbit INTEGER, left INTEGER, right INTEGER)")
+            self.conn.execute("CREATE TABLE tOut (i INTEGER, j INTEGER, k INTEGER, re REAL, im REAL)")
             for i in range(self.num_qbits):
                   self.conn.execute(f"CREATE TABLE t{i} (i INTEGER, j INTEGER, k INTEGER, re REAL, im REAL)")
                   self.conn.execute(f"INSERT INTO t{i} VALUES (0,0,0,1,0)")
                   self.conn.execute(f"INSERT INTO tShape VALUES ({i},1,1)")
       
       def init_gates(self):
-            for x in self.gates:
-                  gate:np.ndarray=getattr(gates,x)()
-                  if len(gate.shape)==2:
-                        self.conn.execute(f"CREATE TABLE t{x} (i INTEGER, j INTEGER, re REAL, im REAL)")
-                        gate:np.ndarray=getattr(gates,x)()
-                        for idx,z in np.ndenumerate(gate):
-                              self.conn.execute(f"INSERT INTO t{x} (i, j, re,im) VALUES ({idx[0]},{idx[1]} , {z.real}, {z.imag})")
-                  elif len(gate.shape)==4:
-                        self.conn.execute(f"CREATE TABLE t{x} (i INTEGER, j INTEGER, k INTEGER, l INTEGER, re REAL, im REAL)")
-                        gate:np.ndarray=getattr(gates,x)()
-                        for idx,z in np.ndenumerate(gate):
-                              self.conn.execute(f"INSERT INTO t{x} (i, j,k,l, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]},{idx[3]} , {z.real}, {z.imag})")
+            for name,params in self.gates.items():
+                  try:
+                        if params is None:
+                                    gate:np.ndarray=getattr(gates,name)()
+                                    self._setup_gate(name,gate)
+                        else:
+                             for val,suffix in params.items():
+                                    if val=='ct':
+                                          continue
+                                    gate:np.ndarray=getattr(gates,name)(float(val))
+                                    self._setup_gate(name+str(suffix),gate)
+                  except Exception as  e:
+                              print(e)
+                              print(f"!!----{name} gate not supported----!")
+      
+      def _setup_gate(self,x:str,gate:np.ndarray):
+            if len(gate.shape)==2:
+                  self.conn.execute(f"CREATE TABLE t{x} (i INTEGER, j INTEGER, re REAL, im REAL)")
+                  for idx,z in np.ndenumerate(gate):
+                        self.conn.execute(f"INSERT INTO t{x} (i, j, re,im) VALUES ({idx[0]},{idx[1]} , {z.real}, {z.imag})")
+            elif len(gate.shape)==4:
+                  self.conn.execute(f"CREATE TABLE t{x} (i INTEGER, j INTEGER, k INTEGER, l INTEGER, re REAL, im REAL)")
+                  for idx,z in np.ndenumerate(gate):
+                        self.conn.execute(f"INSERT INTO t{x} (i, j,k,l, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]},{idx[3]} , {z.real}, {z.imag})")
       
       def apply_one_qbit_gate(self,qbit:int,gate:str):
             tic=timer()
@@ -123,30 +139,6 @@ class SQLITE_MPS:
             self.conn.execute("DROP TABLE [IF EXISTS] tOut;")
             self.conn.execute("DROP TABLE [IF EXISTS] tTemp;")
 
-      @staticmethod
-      def run_circuit_json(data) -> 'SQLITE_MPS':
-            num_qubits = data["number_of_qubits"]
-            gates_data =data["gates"]
-            gates =  {x['gate'] for x in gates_data}
-            sim=SQLITE_MPS(num_qubits,gates)
-            for x in gates_data:
-                  tic=timer()
-                  sim.save_state_tables()
-                  if len(x['qubits'])==1:
-                        sim.apply_one_qbit_gate(x['qubits'][0],x['gate'])
-                  elif len(x['qubits'])==2:
-                        sim.apply_two_qbit_gate(x['qubits'][0],x['qubits'][1],x['gate'])
-                  toc=timer()
-                  sim.times.append(toc-tic)
-            sim.save_state_tables()
-            return sim
-      
-      # def get_statevector(self):
-      #       self.conn.execute("INSERT  INTO tOut (i,j,k,l,re,im) SELECT * FROM t{0}")
-      #       for i in range(1,self.num_qbits):
-      #             self.conn.execute(f"""WITH temp AS (SELECT A.i as i, A.j as j, B.j as k, B.k as l, SUM(B.re * A.re - B.im * A.im) AS re, SUM(B.re * A.im + B.im * A.re) AS im 
-      #                                     FROM tOut as A JOIN  t{i} B ON A.k= B.i GROUP BY A.i,A.j,B.j,B.k ORDER BY i,j,k,l)
-      #                               INSERT  INTO tTemp (i,j,k,l,re,im)""")
       def get_statevector_np(self):
             s=self.conn.execute("SELECT * FROM tShape").fetchall()
             tensors=[np.zeros((x[1],2,x[2]),dtype=np.complex128) for x in s]
@@ -160,26 +152,51 @@ class SQLITE_MPS:
                   tensor = np.tensordot(tensor, tensors[i], axes=([-1], [0]))
             tensor = tensor.reshape(-1)
             return tensor
+
+      @staticmethod
+      def run_circuit_json(data) -> 'SQLITE_MPS':
+            num_qubits = data["number_of_qubits"]
+            gates_data =data["gates"]                  
+            gates= {}
+            #setup gate dicts for parametrized gates
+            for x in gates_data:
+                  if "parameters" not in x:
+                        gates[x['gate']]=None
+                  else:
+                        for val in x["parameters"]:
+                              tmp=gates.get(x['gate'],{"ct":0})
+                              i=tmp["ct"]
+                              tmp["ct"]=i+1
+                              tmp[str(val)]=i
+                              gates[x['gate']]=tmp
+            print(gates)
+            sim=SQLITE_MPS(num_qubits,gates)
+            #apply gates
+            for x in gates_data:
+                  gate_name=x['gate']
+                  if "parameters" in x:
+                        val=str(x['parameters'][0])
+                        gate_name+=str(gates[x['gate']][val])
+                  tic=timer()
+                  if len(x['qubits'])==1:
+                        sim.apply_one_qbit_gate(x['qubits'][0],gate_name)
+                  elif len(x['qubits'])==2:
+                        sim.apply_two_qbit_gate(x['qubits'][0],x['qubits'][1],gate_name)
+                  toc=timer()
+                  sim.times.append(toc-tic)
+            return sim
       
-      def get_times(self):
-            return self.times
 
 if __name__ == "__main__":
-      file=open("./circuits/example.json")
+      file=open("./circuits/parametrized.json")
       data=json.load(file)
-      t=SQLITE_MPS(3,{"H","CNOT"})
       tic=timer()
       t=SQLITE_MPS.run_circuit_json(data)
-      t.check_db()
       # print("\n\n")
       # t.apply_one_qbit_gate(0,"H")
-      # t.apply_two_qbit_gate(0,1,"CNOT")
-      # t.apply_two_qbit_gate(1,2,"CNOT")
+      # t.apply_one_qbit_gate(0,"P0")
       toc=timer()
       x=t.get_statevector_np()
       # print(toc-tic)
       print(t.get_statevector_np())
 
-      for g in t.gates:
-            df = pd.read_sql_query(f"SELECT * FROM t{g};", t.conn)
-            print(f"t{g}")

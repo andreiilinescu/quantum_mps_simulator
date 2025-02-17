@@ -1,0 +1,18 @@
+{
+    "number_of_qubits": 3,
+    "gates": [
+      {
+          "qubits": [0],
+          "gate": "H"
+      },
+      {
+          "qubits": [0],
+          "gate": "P",
+          "parameters":[0.244444444]
+      },
+      {
+          "qubits": [1,2],
+          "gate": "CNOT"
+      }
+    ]
+  }

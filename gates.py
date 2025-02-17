@@ -58,6 +58,11 @@ def CT() -> np.array:
 def CP(theta: float) -> np.array:
     return create_two_qbit_control_gate(P(theta))
 
+def CRY(angle):
+    cp = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, np.cos(angle / 2.0), -np.sin(angle / 2.0)],
+                   [0, 0, np.sin(angle / 2.0), np.cos(angle / 2.0)]])
+    return np.reshape(cp, (2, 2, 2, 2))
+
 
 def SWAP() -> np.array:
     swap=np.array([[1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,0,1]])
@@ -98,3 +103,8 @@ def T() -> np.array:
 def P(theta: float) -> np.array:
     return np.array([[1, 0], [0, np.exp(1j * theta)]], dtype=np.complex128)
 
+def G(p: float) -> np.array:
+    return np.array([[complex(np.sqrt(p),0), complex(-np.sqrt(1-p),0)], [complex(np.sqrt(1-p),0), complex(np.sqrt(p),0)]])
+
+def RY(angle):
+    return np.array([[np.cos(angle / 2.0), -np.sin(angle / 2.0)], [np.sin(angle / 2.0), np.cos(angle / 2.0)]])
