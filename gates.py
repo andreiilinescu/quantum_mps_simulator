@@ -1,6 +1,6 @@
 import numpy as np
 
-def create_two_qbit_control_gate(gate: np.array) -> np.array:
+def create_two_qbit_control_gate(gate: np.array) -> np.ndarray:
     I=np.eye(4, dtype=np.complex128)
     I[2][2]=gate[0][0]
     I[2][3]=gate[0][1]
@@ -10,7 +10,7 @@ def create_two_qbit_control_gate(gate: np.array) -> np.array:
 
 # THREE QUBIT GATES
 
-def TOFFOLI() -> np.array:
+def TOFFOLI() -> np.ndarray:
     i=np.eye(8, dtype=np.complex128)
     i[6][6]=0
     i[6][7]=1
@@ -23,48 +23,49 @@ def TOFFOLI() -> np.array:
 # TWO QUBIT GATES
 
 
-def CH() -> np.array:
+def CH() -> np.ndarray:
     return create_two_qbit_control_gate(H())
 
 
-def CNOT() -> np.array:
+def CNOT() -> np.ndarray:
     return create_two_qbit_control_gate(X())
 
 
-def CX() -> np.array:
+def CX() -> np.ndarray:
     return create_two_qbit_control_gate(X())
 
 
-def CY() -> np.array:
+def CY() -> np.ndarray:
     return create_two_qbit_control_gate(Y())
 
 
-def CZ() -> np.array:
+def CZ() -> np.ndarray:
     return create_two_qbit_control_gate(Z())
 
 
-def CS() -> np.array:
+def CS() -> np.ndarray:
     return create_two_qbit_control_gate(S())
 
 
-def CSDG() -> np.array:
+def CSDG() -> np.ndarray:
     return create_two_qbit_control_gate(SDG())
 
 
-def CT() -> np.array:
+def CT() -> np.ndarray:
     return create_two_qbit_control_gate(T())
 
 
-def CP(theta: float) -> np.array:
+def CP(theta: float) -> np.ndarray:
     return create_two_qbit_control_gate(P(theta))
 
-def CRY(angle):
-    cp = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, np.cos(angle / 2.0), -np.sin(angle / 2.0)],
-                   [0, 0, np.sin(angle / 2.0), np.cos(angle / 2.0)]])
-    return np.reshape(cp, (2, 2, 2, 2))
+def CRY(theta: float) -> np.ndarray:
+    return create_two_qbit_control_gate(RY(theta))
+
+def CG(theta: float) -> np.ndarray:
+    return create_two_qbit_control_gate(G(theta))
 
 
-def SWAP() -> np.array:
+def SWAP() -> np.ndarray:
     swap=np.array([[1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,0,1]])
     return swap.reshape((2,2,2,2))
 
@@ -72,39 +73,39 @@ def SWAP() -> np.array:
 # ONE QUBIT GATES
 
 
-def H() -> np.array:
+def H() -> np.ndarray:
     return 1 / np.sqrt(2) * np.array([[1, 1], [1, -1]], dtype=np.complex128)
 
 
-def X() -> np.array:
+def X() -> np.ndarray:
     return np.array([[0, 1], [1, 0]], dtype=np.complex128)
 
 
-def Y() -> np.array:
+def Y() -> np.ndarray:
     return np.array([[0, -1j], [1j, 0]], dtype=np.complex128)
 
 
-def Z() -> np.array:
+def Z() -> np.ndarray:
     return np.array([[1, 0], [0, -1]], dtype=np.complex128)
 
 
-def S() -> np.array:
+def S() -> np.ndarray:
     return np.array([[1, 0], [0, 1j]], dtype=np.complex128)
 
 
-def SDG() -> np.array:
+def SDG() -> np.ndarray:
     return np.array([[1, 0], [0, -1j]], dtype=np.complex128)
 
 
-def T() -> np.array:
+def T() -> np.ndarray:
     return np.array([[1, 0], [0, np.exp(1j * np.pi / 4)]], dtype=np.complex128)
 
 
-def P(theta: float) -> np.array:
+def P(theta: float) -> np.ndarray:
     return np.array([[1, 0], [0, np.exp(1j * theta)]], dtype=np.complex128)
 
-def G(p: float) -> np.array:
+def G(p: float) -> np.ndarray:
     return np.array([[complex(np.sqrt(p),0), complex(-np.sqrt(1-p),0)], [complex(np.sqrt(1-p),0), complex(np.sqrt(p),0)]])
 
-def RY(angle):
-    return np.array([[np.cos(angle / 2.0), -np.sin(angle / 2.0)], [np.sin(angle / 2.0), np.cos(angle / 2.0)]])
+def RY(angle) -> np.ndarray:
+    return np.array([[np.cos(angle / 2.0), -np.sin(angle / 2.0)], [np.sin(angle / 2.0), np.cos(angle / 2.0)]]).transpose()
