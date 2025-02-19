@@ -5,6 +5,7 @@ import json
 import pandas as pd
 from timeit import default_timer as timer
 from svd_udf_py import SvdAggregator
+from plotting import plot_statevector
 CPP=False
 PARAMETER_ACC=4
 class SQLITE_MPS:
@@ -62,12 +63,11 @@ class SQLITE_MPS:
       
       def apply_one_qbit_gate(self,qbit:int,gate:str):
             tic=timer()
-            res=self.conn.execute(f"""SELECT qb.i as i, gate.j as j, qb.k as k, SUM(gate.re * qb.re - gate.im * qb.im) AS re, SUM(gate.re * qb.im + gate.im * qb.re) AS im 
-                                 FROM t{qbit} as qb JOIN  t{gate} gate ON qb.j= gate.i GROUP BY qb.i,gate.j,qb.k ORDER BY i,j,k""").fetchall()
+            res=self.conn.execute(f"""SELECT qb.i as i, gate.i as j, qb.k as k, SUM(gate.re * qb.re - gate.im * qb.im) AS re, SUM(gate.re * qb.im + gate.im * qb.re) AS im 
+                                 FROM t{qbit} as qb JOIN  t{gate} gate ON qb.j= gate.j GROUP BY qb.i,gate.i,qb.k ORDER BY i,j,k""").fetchall()
             self.conn.execute(f"DELETE  FROM   t{qbit};")
             self.conn.executemany(f"INSERT INTO t{qbit} (i,j,k,re,im) VALUES (?,?,?,?,?)",res)
             toc= timer()
-            print(toc-tic)
 
       def apply_two_qbit_gate(self,first_qbit:int,second_qubit:int,gate:str):
             if(first_qbit>second_qubit):
@@ -169,7 +169,6 @@ class SQLITE_MPS:
                               tmp["ct"]=i+1
                               tmp[str(val)]=i
                               gates[x['gate']]=tmp
-            print(gates)
             sim=SQLITE_MPS(num_qubits,gates)
             #apply gates
             for x in gates_data:
@@ -192,11 +191,12 @@ if __name__ == "__main__":
       data=json.load(file)
       tic=timer()
       t=SQLITE_MPS.run_circuit_json(data)
-      # print("\n\n")
+      # print("\n\n")   
       # t.apply_one_qbit_gate(0,"H")
       # t.apply_one_qbit_gate(0,"P0")
       toc=timer()
       x=t.get_statevector_np()
       # print(toc-tic)
       print(t.get_statevector_np())
+      plot_statevector(x)
 

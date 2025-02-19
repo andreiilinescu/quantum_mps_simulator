@@ -108,4 +108,4 @@ def G(p: float) -> np.ndarray:
     return np.array([[complex(np.sqrt(p),0), complex(-np.sqrt(1-p),0)], [complex(np.sqrt(1-p),0), complex(np.sqrt(p),0)]])
 
 def RY(angle) -> np.ndarray:
-    return np.array([[np.cos(angle / 2.0), -np.sin(angle / 2.0)], [np.sin(angle / 2.0), np.cos(angle / 2.0)]]).transpose()
+    return np.array([[np.cos(angle / 2.0), -np.sin(angle / 2.0)], [np.sin(angle / 2.0), np.cos(angle / 2.0)]])
