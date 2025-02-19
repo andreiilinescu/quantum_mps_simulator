@@ -160,7 +160,7 @@ class SQLITE_MPS:
             gates= {}
             #setup gate dicts for parametrized gates
             for x in gates_data:
-                  if "parameters" not in x:
+                  if "parameters" not in x or len(x["parameters"])==0:
                         gates[x['gate']]=None
                   else:
                         for val in x["parameters"]:
@@ -173,7 +173,7 @@ class SQLITE_MPS:
             #apply gates
             for x in gates_data:
                   gate_name=x['gate']
-                  if "parameters" in x:
+                  if "parameters" in x and len(x["parameters"])!=0:
                         val=str(x['parameters'][0])
                         gate_name+=str(gates[x['gate']][val])
                   tic=timer()
