@@ -2,29 +2,35 @@ import sqlite3
 import gates as gates
 import numpy as np
 import json
+import tracemalloc
 import pandas as pd
 from timeit import default_timer as timer
 from svd_udf_py import SvdAggregator
 from plotting import plot_statevector
-CPP=False
-PARAMETER_ACC=4
+# CPP=False
+DEFAULT_GATES=["H","X","Y","Z","S","SDG","T","CH","CNOT","CX","CY","CZ","CS","CSDG","CT"]
 class SQLITE_MPS:
       def __init__(self,qbits:int,gates:dict):
             self.num_qbits=qbits
             self.times=[]
+            self.analytics={"oneq_times":[],"twoq_times":[],"times":[],"oneq_mem":[],"twoq_mem":[],"mem":[]}
             self.conn = sqlite3.connect(":memory:")
-            if CPP:
-                  self.conn.enable_load_extension(True)
-                  self.conn.load_extension("./svd_udf.so")
-            else:
-                  self.conn.create_aggregate("svd_agg", 8, SvdAggregator)
+            # if CPP:
+            #       self.conn.enable_load_extension(True)
+            #       self.conn.load_extension("./svd_udf.so")
+            # else:
+            self.conn.create_aggregate("svd_agg", 8, SvdAggregator)
 
-            gates["SWAP"]=None
-            self.gates=gates
             
-
+            self.gates=gates
+            self.gates["SWAP"]=None
             self.initialize_db()
             self.init_gates()
+
+      def init_default_gates(self):
+            for gate_name in DEFAULT_GATES:
+                  gate:np.ndarray=getattr(gates,gate_name)()
+                  self._setup_gate(gate_name,gate)
 
       def initialize_db(self):   
             self.conn.execute("CREATE TABLE tTemp (i INTEGER, j INTEGER, k INTEGER, l INTEGER, re REAL, im REAL)")
@@ -39,13 +45,11 @@ class SQLITE_MPS:
             for name,params in self.gates.items():
                   try:
                         if params is None:
-                                    gate:np.ndarray=getattr(gates,name)()
-                                    self._setup_gate(name,gate)
+                              gate:np.ndarray=getattr(gates,name)()
+                              self._setup_gate(name,gate)
                         else:
                              for val,suffix in params.items():
-                                    if val=='ct':
-                                          continue
-                                    gate:np.ndarray=getattr(gates,name)(float(val))
+                                    gate:np.ndarray=getattr(gates,name)(*val) # pass multiple params if tuple
                                     self._setup_gate(name+str(suffix),gate)
                   except Exception as  e:
                               print(e)
@@ -62,17 +66,17 @@ class SQLITE_MPS:
                         self.conn.execute(f"INSERT INTO t{x} (i, j,k,l, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]},{idx[3]} , {z.real}, {z.imag})")
       
       def apply_one_qbit_gate(self,qbit:int,gate:str):
-            tic=timer()
             res=self.conn.execute(f"""SELECT qb.i as i, gate.i as j, qb.k as k, SUM(gate.re * qb.re - gate.im * qb.im) AS re, SUM(gate.re * qb.im + gate.im * qb.re) AS im 
                                  FROM t{qbit} as qb JOIN  t{gate} gate ON qb.j= gate.j GROUP BY qb.i,gate.i,qb.k ORDER BY i,j,k""").fetchall()
             self.conn.execute(f"DELETE  FROM   t{qbit};")
             self.conn.executemany(f"INSERT INTO t{qbit} (i,j,k,re,im) VALUES (?,?,?,?,?)",res)
-            toc= timer()
 
       def apply_two_qbit_gate(self,first_qbit:int,second_qubit:int,gate:str):
+            path=[]
             if(first_qbit>second_qubit):
                   first_qbit,second_qubit=second_qubit,first_qbit
-            path=[]
+                  path.append((first_qbit,first_qbit+1))
+
             for q in range(second_qubit, first_qbit+1, -1):
                 path.append((q - 1, q))
             #contraction
@@ -163,40 +167,56 @@ class SQLITE_MPS:
                   if "parameters" not in x or len(x["parameters"])==0:
                         gates[x['gate']]=None
                   else:
-                        for val in x["parameters"]:
-                              tmp=gates.get(x['gate'],{"ct":0})
-                              i=tmp["ct"]
-                              tmp["ct"]=i+1
-                              tmp[str(val)]=i
-                              gates[x['gate']]=tmp
+                        params=tuple(x["parameters"])
+                        print(params)
+                        tmp=gates.get(x['gate'],{})
+                        tmp[params]=len(tmp.keys())
+                        gates[x['gate']]=tmp
+            print(gates)
             sim=SQLITE_MPS(num_qubits,gates)
             #apply gates
             for x in gates_data:
                   gate_name=x['gate']
                   if "parameters" in x and len(x["parameters"])!=0:
-                        val=str(x['parameters'][0])
+                        val=tuple(x['parameters'])
                         gate_name+=str(gates[x['gate']][val])
-                  tic=timer()
                   if len(x['qubits'])==1:
+                        tracemalloc.start() 
+
+                        tic=timer()
                         sim.apply_one_qbit_gate(x['qubits'][0],gate_name)
+                        toc=timer() #timer
+
+                        mem=tracemalloc.get_traced_memory() # memory data
+                        tracemalloc.stop()
+
+                        sim.analytics["oneq_times"].append(toc-tic)
+                        sim.analytics["oneq_mem"].append(mem)
+                        sim.analytics["times"].append(toc-tic)
+                        sim.analytics["mem"].append(mem)
                   elif len(x['qubits'])==2:
+                        tracemalloc.start() 
+
+                        tic=timer()
                         sim.apply_two_qbit_gate(x['qubits'][0],x['qubits'][1],gate_name)
-                  toc=timer()
-                  sim.times.append(toc-tic)
+                        toc=timer() #timer
+
+                        mem=tracemalloc.get_traced_memory() # memory data
+                        tracemalloc.stop()
+
+                        sim.analytics["twoq_times"].append(toc-tic)
+                        sim.analytics["twoq_mem"].append(mem)
+                        sim.analytics["times"].append(toc-tic)
+                        sim.analytics["mem"].append(mem)
             return sim
       
 
 if __name__ == "__main__":
-      file=open("./circuits/parametrized.json")
+      file=open("./circuits/example.json")
       data=json.load(file)
-      tic=timer()
       t=SQLITE_MPS.run_circuit_json(data)
-      # print("\n\n")   
-      # t.apply_one_qbit_gate(0,"H")
-      # t.apply_one_qbit_gate(0,"P0")
-      toc=timer()
+      print(t.analytics)
       x=t.get_statevector_np()
-      # print(toc-tic)
       print(t.get_statevector_np())
       plot_statevector(x)
 

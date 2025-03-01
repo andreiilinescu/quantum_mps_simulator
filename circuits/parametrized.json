@@ -3,12 +3,18 @@
     "gates": [
       {
           "qubits": [0],
-          "gate": "H"
+          "gate": "H",
+          "parameters":[]
       },
       {
           "qubits": [0],
           "gate": "RY",
           "parameters":[0.244444444]
-      }
+      },
+      {
+        "qubits": [0],
+        "gate": "RY",
+        "parameters":[0.245444444]
+    }
     ]
   }
