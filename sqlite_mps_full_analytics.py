@@ -9,7 +9,7 @@ from svd_udf_py import SvdAggregator
 from plotting import plot_statevector
 # CPP=False
 DEFAULT_GATES=["H","X","Y","Z","S","SDG","T","CH","CNOT","CX","CY","CZ","CS","CSDG","CT"]
-class SQLITE_MPS:
+class SQLITE_MPS_Analytics:
       def __init__(self,qbits:int,gates:dict):
             self.num_qbits=qbits
             self.analytics=[]
@@ -67,15 +67,22 @@ class SQLITE_MPS:
                               self.conn.execute(f"INSERT INTO t{x} (i, j,k,l, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]},{idx[3]} , {z.real}, {z.imag})")
       
       def apply_one_qbit_gate(self,qbit:int,gate:str):
+            tic=timer()
             res=self.conn.execute(f"""SELECT qb.i as i, gate.i as j, qb.k as k, SUM(gate.re * qb.re - gate.im * qb.im) AS re, SUM(gate.re * qb.im + gate.im * qb.re) AS im 
                                  FROM t{qbit} as qb JOIN  t{gate} gate ON qb.j= gate.j GROUP BY qb.i,gate.i,qb.k ORDER BY i,j,k""").fetchall()
+            toc=timer()
+            self.analytics[-1]["pure_contraction"]=toc-tic
+            tic=timer()
             self.conn.execute(f"DELETE  FROM   t{qbit};")
             self.conn.executemany(f"INSERT INTO t{qbit} (i,j,k,re,im) VALUES (?,?,?,?,?)",res)
+            toc=timer()
+            self.analytics[-1]["cleanup"]=toc-tic
 
       def apply_two_qbit_gate(self,first_qbit:int,second_qubit:int,gate:str):
             if second_qubit-first_qbit==1:
                   self._two_qubit_contraction(first_qbit,first_qbit+1,gate)
             else:
+                  tic=timer()
                   path=[]
                   if(first_qbit>second_qubit):
                         first_qbit,second_qubit=second_qubit,first_qbit
@@ -86,20 +93,36 @@ class SQLITE_MPS:
                   #contraction
                   for q1, q2 in path:
                         self._two_qubit_contraction(q1, q2, "SWAP")
+                  toc=timer()
+                  self.analytics[-1]["swap_prep"]=toc-tic
                   self._two_qubit_contraction(first_qbit,first_qbit+1,gate)
+                  tic=timer()
                   for q1, q2 in reversed(path):
                         self._two_qubit_contraction(q1, q2, "SWAP")
+                  toc=timer()
+                  self.analytics[-1]["swap_prep"]+=toc-tic
       def _two_qubit_contraction(self,first_qbit:int,second_qubit:int,gate:str):
-            cursor=self.conn.execute(f"""
+            tic=timer()
+            self.conn.execute(f"""
                                     WITH cont AS (SELECT A.i as i, A.j as j, B.j as k, B.k as l, SUM(B.re * A.re - B.im * A.im) AS re, SUM(B.re * A.im + B.im * A.re) AS im 
-                                          FROM t{first_qbit} as A JOIN  t{second_qubit} B ON A.k= B.i GROUP BY A.i,A.j,B.j,B.k ),
-                                     tTempq  AS (
+                                          FROM t{first_qbit} as A JOIN  t{second_qubit} B ON A.k= B.i GROUP BY A.i,A.j,B.j,B.k ORDER BY i,j,k,l)
+                                    INSERT  INTO tTemp (i,j,k,l,re,im) 
                                     SELECT A.i as i, B.k as j, B.l as k, A.l as l, SUM(B.re * A.re - B.im * A.im) AS re, SUM(B.re * A.im + B.im * A.re) AS im
-                                    FROM cont as A JOIN t{gate} as  B on A.j=B.i AND A.k=B.j GROUP BY A.i, B.k, B.l, A.l HAVING SUM(B.re * A.re - B.im * A.im)!=0 OR SUM(B.re * A.im + B.im * A.re)!=0  
-                                          )
-                                    SELECT svd_agg(i,j,k,l,re,im, (SELECT "left"  FROM tShape WHERE qbit = {first_qbit}),(SELECT "right" FROM tShape WHERE qbit = {second_qubit}))
-                                    FROM tTempq""")
+                                    FROM cont as A JOIN t{gate} as  B on A.j=B.i AND A.k=B.j GROUP BY A.i, B.k, B.l, A.l HAVING SUM(B.re * A.re - B.im * A.im)!=0 OR SUM(B.re * A.im + B.im * A.re)!=0  ORDER BY i,j,k,l  
+                                          """)
             #clear tables
+            toc=timer()
+            self.analytics[-1]["pure_contraction"]=toc-tic
+
+            tic=timer()
+            cursor = self.conn.execute(f"""
+                  SELECT svd_agg(i,j,k,l,re,im, (SELECT "left"  FROM tShape WHERE qbit = {first_qbit}),(SELECT "right" FROM tShape WHERE qbit = {second_qubit}))
+                  FROM tTemp
+                  """)
+            toc=timer()
+            self.analytics[-1]["svd"]=toc-tic
+
+            tic=timer()
             self.conn.execute(f"DELETE  FROM   t{first_qbit};")
             self.conn.execute(f"DELETE  FROM   t{second_qubit};")
             result_json = json.loads(cursor.fetchone()[0])
@@ -120,6 +143,9 @@ class SQLITE_MPS:
             self.conn.execute(f"UPDATE tShape SET left={sh[0][0]}, right={sh[0][1]} WHERE qbit={first_qbit}")
             self.conn.execute(f"UPDATE tShape SET left={sh[1][0]}, right={sh[1][1]} WHERE qbit={second_qubit}")
 
+            self.conn.execute(f"DELETE  FROM   tTemp;")
+            toc=timer()
+            self.analytics[-1]["cleanup"]=toc-tic
 
       def check_db(self):
             for i in range(self.num_qbits):
@@ -168,10 +194,12 @@ class SQLITE_MPS:
                         gates[x['gate']]=None
                   else:
                         params=tuple(x["parameters"])
+                        print(params)
                         tmp=gates.get(x['gate'],{})
                         tmp[params]=len(tmp.keys())
                         gates[x['gate']]=tmp
-            sim=SQLITE_MPS(num_qubits,gates)
+            print(gates)
+            sim=SQLITE_MPS_Analytics(num_qubits,gates)
             #apply gates
             for x in gates_data:
                   gate_name=x['gate']
@@ -200,9 +228,8 @@ class SQLITE_MPS:
 if __name__ == "__main__":
       file=open("./circuits/example.json")
       data=json.load(file)
-      t=SQLITE_MPS.run_circuit_json(data)
+      t=SQLITE_MPS_Analytics.run_circuit_json(data)
       print(t.analytics)
       x=t.get_statevector_np()
       print(t.get_statevector_np())
       plot_statevector(x)
-      print(t.conn.execute("SELECT * FROM tCNOT;").fetchall())
