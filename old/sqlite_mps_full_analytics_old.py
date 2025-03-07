@@ -7,15 +7,29 @@ import pandas as pd
 from timeit import default_timer as timer
 from svd_udf_py import SvdAggregator
 from plotting import plot_statevector
-class SQLITE_MPS:
+# CPP=False
+DEFAULT_GATES=["H","X","Y","Z","S","SDG","T","CH","CNOT","CX","CY","CZ","CS","CSDG","CT"]
+class SQLITE_MPS_Analytics:
       def __init__(self,qbits:int,gates:dict):
             self.num_qbits=qbits
-            self.times=[]
+            self.analytics=[]
             self.conn = sqlite3.connect(":memory:")
+            # if CPP:
+            #       self.conn.enable_load_extension(True)
+            #       self.conn.load_extension("./svd_udf.so")
+            # else:
             self.conn.create_aggregate("svd_agg", 8, SvdAggregator)
-            gates["SWAP"]=np.array([[1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,0,1]]).reshape((2,2,2,2))
+
+            
+            self.gates=gates
+            self.gates["SWAP"]=None
             self.initialize_db()
-            self.init_gates(gates)
+            self.init_gates()
+
+      def init_default_gates(self):
+            for gate_name in DEFAULT_GATES:
+                  gate:np.ndarray=getattr(quantum_gates,gate_name)()
+                  self._setup_gate(gate_name,gate)
 
       def initialize_db(self):   
             self.conn.execute("CREATE TABLE tTemp (i INTEGER, j INTEGER, k INTEGER, l INTEGER, re REAL, im REAL)")
@@ -26,55 +40,67 @@ class SQLITE_MPS:
                   self.conn.execute(f"INSERT INTO t{i} VALUES (0,0,0,1,0)")
                   self.conn.execute(f"INSERT INTO tShape VALUES ({i},1,1)")
       
-      def init_gates(self,gates):
-            for name,gate in gates.items():
-                  if len(gate.shape)==2: #create 1 qbit gate
-                        self.conn.execute(f"CREATE TABLE t{name} (i INTEGER, j INTEGER, re REAL, im REAL)")
-                        for idx,z in np.ndenumerate(gate):
-                              if z!=0.0:
-                                    self.conn.execute(f"INSERT INTO t{name} (i, j, re,im) VALUES ({idx[0]},{idx[1]} , {z.real}, {z.imag})")
-                  elif len(gate.shape)==4: #create 2 qbit gate
-                        self.conn.execute(f"CREATE TABLE t{name} (i INTEGER, j INTEGER, k INTEGER, l INTEGER, re REAL, im REAL)")
-                        for idx,z in np.ndenumerate(gate):
-                              if z!=0.0:
-                                    self.conn.execute(f"INSERT INTO t{name} (i, j,k,l, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]},{idx[3]} , {z.real}, {z.imag})")            
+      def init_gates(self):
+            for name,params in self.gates.items():
+                  try:
+                        if params is None:
+                              gate:np.ndarray=getattr(quantum_gates,name)()
+                              self._setup_gate(name,gate)
+                        else:
+                             for val,suffix in params.items():
+                                    gate:np.ndarray=getattr(quantum_gates,name)(*val) # pass multiple params if tuple
+                                    self._setup_gate(name+str(suffix),gate)
+                  except Exception as  e:
+                              print(e)
+                              print(f"!!----{name} gate not supported----!")
+      
+      def _setup_gate(self,x:str,gate:np.ndarray):
+            if len(gate.shape)==2:
+                  self.conn.execute(f"CREATE TABLE t{x} (i INTEGER, j INTEGER, re REAL, im REAL)")
+                  for idx,z in np.ndenumerate(gate):
+                        if z!=0.0:
+                              self.conn.execute(f"INSERT INTO t{x} (i, j, re,im) VALUES ({idx[0]},{idx[1]} , {z.real}, {z.imag})")
+            elif len(gate.shape)==4:
+                  self.conn.execute(f"CREATE TABLE t{x} (i INTEGER, j INTEGER, k INTEGER, l INTEGER, re REAL, im REAL)")
+                  for idx,z in np.ndenumerate(gate):
+                        if z!=0.0:
+                              self.conn.execute(f"INSERT INTO t{x} (i, j,k,l, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]},{idx[3]} , {z.real}, {z.imag})")
       
       def apply_one_qbit_gate(self,qbit:int,gate:str):
             tic=timer()
             res=self.conn.execute(f"""SELECT qb.i as i, gate.i as j, qb.k as k, SUM(gate.re * qb.re - gate.im * qb.im) AS re, SUM(gate.re * qb.im + gate.im * qb.re) AS im 
                                  FROM t{qbit} as qb JOIN  t{gate} gate ON qb.j= gate.j GROUP BY qb.i,gate.i,qb.k ORDER BY i,j,k""").fetchall()
             toc=timer()
-            self.times[-1]["pure_contraction"]=toc-tic
+            self.analytics[-1]["pure_contraction"]=toc-tic
             tic=timer()
             self.conn.execute(f"DELETE  FROM   t{qbit};")
             self.conn.executemany(f"INSERT INTO t{qbit} (i,j,k,re,im) VALUES (?,?,?,?,?)",res)
             toc=timer()
-            self.times[-1]["cleanup"]=toc-tic
+            self.analytics[-1]["cleanup"]=toc-tic
 
       def apply_two_qbit_gate(self,first_qbit:int,second_qubit:int,gate:str):
             if second_qubit-first_qbit==1:
                   self._two_qubit_contraction(first_qbit,first_qbit+1,gate)
             else:
-                tic=timer()
-                path=[]
-                if(first_qbit>second_qubit): # inverse qbits if needed
+                  tic=timer()
+                  path=[]
+                  if(first_qbit>second_qubit):
                         first_qbit,second_qubit=second_qubit,first_qbit
                         path.append((first_qbit,first_qbit+1))
 
-                for q in range(second_qubit, first_qbit+1, -1):
+                  for q in range(second_qubit, first_qbit+1, -1):
                         path.append((q - 1, q))
-                for q1, q2 in path:
+                  #contraction
+                  for q1, q2 in path:
                         self._two_qubit_contraction(q1, q2, "SWAP")
-                toc=timer()
-                self.times[-1]["swap_prep"]=toc-tic
-
-                self._two_qubit_contraction(first_qbit,first_qbit+1,gate)
-                
-                tic=timer()
-                for q1, q2 in reversed(path):
+                  toc=timer()
+                  self.analytics[-1]["swap_prep"]=toc-tic
+                  self._two_qubit_contraction(first_qbit,first_qbit+1,gate)
+                  tic=timer()
+                  for q1, q2 in reversed(path):
                         self._two_qubit_contraction(q1, q2, "SWAP")
-                toc=timer()
-                self.times[-1]["swap_prep"]+=toc-tic
+                  toc=timer()
+                  self.analytics[-1]["swap_prep"]+=toc-tic
       def _two_qubit_contraction(self,first_qbit:int,second_qubit:int,gate:str):
             tic=timer()
             self.conn.execute(f"""
@@ -86,7 +112,7 @@ class SQLITE_MPS:
                                           """)
             #clear tables
             toc=timer()
-            self.times[-1]["pure_contraction"]=toc-tic
+            self.analytics[-1]["pure_contraction"]=toc-tic
 
             tic=timer()
             cursor = self.conn.execute(f"""
@@ -94,7 +120,7 @@ class SQLITE_MPS:
                   FROM tTemp
                   """)
             toc=timer()
-            self.times[-1]["svd"]=toc-tic
+            self.analytics[-1]["svd"]=toc-tic
 
             tic=timer()
             self.conn.execute(f"DELETE  FROM   t{first_qbit};")
@@ -119,8 +145,29 @@ class SQLITE_MPS:
 
             self.conn.execute(f"DELETE  FROM   tTemp;")
             toc=timer()
-            self.times[-1]["cleanup"]=toc-tic
+            self.analytics[-1]["cleanup"]=toc-tic
 
+      def check_db(self):
+            for i in range(self.num_qbits):
+                  res=self.conn.execute(f"SELECT * FROM t{i}").fetchall()
+                  print(res)
+            res=self.conn.execute(f"SELECT * FROM tTemp").fetchall()
+            print(res)
+
+      def save_state_tables(self):
+            out=[]
+            for i in range(self.num_qbits):
+                  df = pd.read_sql_query(f"SELECT * FROM t{i};", self.conn)
+                  print(f"t{i}")
+                  out.append(df)
+            return out
+      
+      def cleanup(self):
+            for i in range(self.num_qbits):
+                  self.conn.execute(f"DROP TABLE [IF EXISTS] t{i};")
+            self.conn.execute("DROP TABLE [IF EXISTS] tShape;")
+            self.conn.execute("DROP TABLE [IF EXISTS] tOut;")
+            self.conn.execute("DROP TABLE [IF EXISTS] tTemp;")
 
       def get_statevector_np(self):
             s=self.conn.execute("SELECT * FROM tShape").fetchall()
@@ -137,48 +184,48 @@ class SQLITE_MPS:
             return tensor
 
       @staticmethod
-      def run_circuit_json(data:dict) -> 'SQLITE_MPS':
+      def run_circuit_json(data) -> 'SQLITE_MPS':
             num_qubits = data["number_of_qubits"]
             gates_data =data["gates"]                  
-            sim_gates= {}
-            applied_gates=[]
-            parametrized_gates={}
-            for gate in gates_data:
-                  name=gate['gate']
-                  if "parameters" not in gate or len(gate["parameters"])==0:
-                        sim_gates[name]=getattr(quantum_gates,name)()
+            gates= {}
+            #setup gate dicts for parametrized gates
+            for x in gates_data:
+                  if "parameters" not in x or len(x["parameters"])==0:
+                        gates[x['gate']]=None
                   else:
-                        params=tuple(gate["parameters"]) 
-                        parametrized_gates[name]=parametrized_gates.get(name,{})
-                        if params not in parametrized_gates[name]:
-                              parametrized_gates[name][params]=str(len(parametrized_gates[name]))
-                        sim_gates[name+parametrized_gates[name][params]]=getattr(quantum_gates,name)(*params)
-                        name+=parametrized_gates[name][params]
-                  applied_gates.append((name,gate['qubits']))
+                        params=tuple(x["parameters"])
+                        tmp=gates.get(x['gate'],{})
+                        tmp[params]=len(tmp.keys())
+                        gates[x['gate']]=tmp
+            sim=SQLITE_MPS_Analytics(num_qubits,gates)
+            #apply gates
+            for x in gates_data:
+                  gate_name=x['gate']
+                  if "parameters" in x and len(x["parameters"])!=0:
+                        val=tuple(x['parameters'])
+                        gate_name+=str(gates[x['gate']][val])
 
-            sim = SQLITE_MPS(num_qubits,sim_gates)
-            
-            for gate in applied_gates:
-                sim.times.append({"total_time":None})
-                name, qbits=gate
-                tic=timer()
-                if len(qbits)==1:
-                    sim.apply_one_qbit_gate(qbits[0],name)
-                elif len(qbits)==2:
-                    sim.apply_two_qbit_gate(qbits[0],qbits[1],name)
-                toc=timer() 
+                  sim.analytics.append({"total_time":None,"total_mem":None,**x})
+                  tic=timer()
 
-                sim.times[-1]["total_time"]=toc-tic
+                  if len(x['qubits'])==1:
+                        sim.apply_one_qbit_gate(x['qubits'][0],gate_name)
+                  elif len(x['qubits'])==2:
+                        sim.apply_two_qbit_gate(x['qubits'][0],x['qubits'][1],gate_name)
+
+                  toc=timer() #timer
+
+
+                  sim.analytics[-1]["total_time"]=toc-tic
+                  sim.analytics[-1]["total_mem"]=mem
             return sim
-
-
       
 
 if __name__ == "__main__":
       file=open("./circuits/example.json")
       data=json.load(file)
-      t=SQLITE_MPS.run_circuit_json(data)
-      print(t.times)
+      t=SQLITE_MPS_Analytics.run_circuit_json(data)
+      print(t.analytics)
       x=t.get_statevector_np()
       print(t.get_statevector_np())
       plot_statevector(x)
