@@ -49,12 +49,17 @@ class SQLITE_MPS:
                   self._two_qubit_contraction(first_qbit,first_qbit+1,gate)
             else:
                   path=[]
+                  add=False
                   if(first_qbit>second_qubit): # inverse qbits if needed
                         first_qbit,second_qubit=second_qubit,first_qbit
-                        path.append((first_qbit,first_qbit+1))
+                        add=True
 
                   for q in range(second_qubit, first_qbit+1, -1):
                         path.append((q - 1, q))
+
+                  if add==True:
+                        path.append((first_qbit,first_qbit+1))
+
                   for q1, q2 in path:
                         self._two_qubit_contraction(q1, q2, "SWAP")
 
@@ -139,14 +144,14 @@ class SQLITE_MPS:
                         sim.apply_two_qbit_gate(qbits[0],qbits[1],name)
                   toc=timer() 
 
-            sim.times.append(toc-tic)
+                  sim.times.append(toc-tic)
             return sim
 
 
       
 
 if __name__ == "__main__":
-      file=open("./circuits/parametrized.json")
+      file=open("./circuits/example.json")
       data=json.load(file)
       t=SQLITE_MPS.run_circuit_json(data)
       print(t.times)

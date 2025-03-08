@@ -33,4 +33,44 @@ def plot_multiple_lines(num_qubits,ys,labels, x_axis_label:str='X-axis',y_axis_l
     plt.grid(True)
     plt.show()
 
+def plot_stacked_bars(xlabels: list[str], avgs: list[dict[str, float]], title: str = 'Time Breakdown by Contraction Type'):
+    fig, ax = plt.subplots(figsize=(6, 6))
+    
+    # Use matplotlib's default color cycle.
+    color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    
+    # Dictionary to map each section to a specific color.
+    section_color = {}
+    color_index = 0
+
+    # Set to track labels already used in the legend.
+    seen_labels = set()
+
+    # Helper function to plot a single stacked bar.
+    def plot_stacked_bar(ax, x, breakdown):
+        nonlocal color_index
+        bottom = 0
+        for section, frac in breakdown.items():
+            # Assign a color to the section if it hasn't been assigned yet.
+            if section not in section_color:
+                section_color[section] = color_cycle[color_index % len(color_cycle)]
+                color_index += 1
+            color = section_color[section]
+            
+            # Only assign the label once for the legend.
+            label = section if section not in seen_labels else None
+            seen_labels.add(section)
+            
+            ax.bar(x, frac, bottom=bottom, color=color, label=label)
+            bottom += frac
+
+    # Plot each bar.
+    for lbl, avg in zip(xlabels, avgs):
+        plot_stacked_bar(ax, lbl, avg)
+
+    ax.set_ylabel('Fraction of Total Time')
+    ax.set_title(title)
+    ax.legend()
+
+    plt.show()
 

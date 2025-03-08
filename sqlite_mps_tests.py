@@ -192,6 +192,85 @@ class TestSQLITE_MPS(unittest.TestCase):
         statevector = simulator.get_statevector_np()
         self.assertTrue(np.allclose(statevector, expected, atol=1e-8),
                         f"Expected state {expected} but got {statevector}")
+    
+    def test_non_adjacent_cnot_4q(self):
+        """
+        In a 4-qubit system:
+          - Start with |0000>
+          - Apply X on qubit 1 to prepare |0 1 0 0>
+          - Apply CNOT with qubit 1 (control) and qubit 3 (target).
+            Since qubit 1 is 1, qubit 3 is flipped.
+          - Expected final state: |0 1 0 1>, corresponding to index 5.
+        """
+        simulator = SQLITE_MPS(4, gates)
+        simulator.apply_one_qbit_gate(1, "X")  # |0000> -> |0 1 0 0>
+        simulator.apply_two_qbit_gate(1, 3, "CNOT")  # |0 1 0 0> -> |0 1 0 1>
+        
+        expected = np.zeros(2**4, dtype=complex)
+        expected[5] = 1.0  # binary 0101 -> decimal 5
+        statevector = simulator.get_statevector_np()
+        self.assertTrue(np.allclose(statevector, expected, atol=1e-8),
+                        f"4-qubit non-adjacent CNOT failed. Expected {expected}, got {statevector}")
+
+    def test_non_adjacent_swap_4q(self):
+        """
+        In a 4-qubit system:
+          - Start with |0000>
+          - Apply X on qubit 0 so that state becomes |1 0 0 0> (binary 1000, decimal 8)
+          - Apply SWAP between qubit 0 and qubit 3 (non-adjacent).
+          - Expected final state: |0 0 0 1> (binary 0001, decimal 1)
+        """
+        simulator = SQLITE_MPS(4, gates)
+        simulator.apply_one_qbit_gate(0, "X")  # |0000> -> |1 0 0 0>
+        simulator.apply_two_qbit_gate(0, 3, "SWAP")  # Swap q0 and q3
+        
+        expected = np.zeros(2**4, dtype=complex)
+        expected[1] = 1.0  # binary 0001 -> decimal 1
+        statevector = simulator.get_statevector_np()
+        self.assertTrue(np.allclose(statevector, expected, atol=1e-8),
+                        f"4-qubit non-adjacent SWAP failed. Expected {expected}, got {statevector}")
+
+    def test_non_adjacent_cnot_5q(self):
+        """
+        In a 5-qubit system:
+          - Start with |00000>
+          - Apply X on qubit 1 to prepare |0 1 0 0 0>
+          - Apply CNOT with qubit 1 (control) and qubit 4 (target).
+            Since qubit 1 is 1, qubit 4 flips.
+          - Expected final state: |0 1 0 0 1>, corresponding to index 9.
+        """
+        simulator = SQLITE_MPS(5, gates)
+        simulator.apply_one_qbit_gate(1, "X")  # |00000> -> |0 1 0 0 0>
+        simulator.apply_two_qbit_gate(1, 4, "CNOT")  # |0 1 0 0 0> -> |0 1 0 0 1>
+        
+        expected = np.zeros(2**5, dtype=complex)
+        expected[9] = 1.0  # binary 01001 -> decimal 9
+        statevector = simulator.get_statevector_np()
+        self.assertTrue(np.allclose(statevector, expected, atol=1e-8),
+                        f"5-qubit non-adjacent CNOT failed. Expected {expected}, got {statevector}")
+
+    def test_non_adjacent_multiple_sequence_5q(self):
+        """
+        In a 5-qubit system, perform a sequence of non-adjacent operations:
+          - Start with |00000>
+          - Apply X on qubit 0 and on qubit 4 to prepare |1 0 0 0 1>
+          - Apply SWAP between qubit 0 and qubit 3 (non-adjacent):
+              |1 0 0 0 1> becomes |0 0 0 1 1>
+          - Apply CNOT with qubit 3 (control) and qubit 1 (target):
+              Since qubit 3 is 1, flip qubit 1.
+              Final state becomes |0 1 0 1 1>, which is binary 01011 (decimal 11).
+        """
+        simulator = SQLITE_MPS(5, gates)
+        simulator.apply_one_qbit_gate(0, "X")  # |00000> -> |1 0 0 0 0>
+        simulator.apply_one_qbit_gate(4, "X")  # -> |1 0 0 0 1>
+        simulator.apply_two_qbit_gate(0, 3, "SWAP")  # Swap qubit 0 and qubit 3: -> |0 0 0 1 1>
+        simulator.apply_two_qbit_gate(3, 1, "CNOT")  # CNOT: control q3 is 1, flip q1: -> |0 1 0 1 1>
+        
+        expected = np.zeros(2**5, dtype=complex)
+        expected[11] = 1.0  # binary 01011 -> decimal 11
+        statevector = simulator.get_statevector_np()
+        self.assertTrue(np.allclose(statevector, expected, atol=1e-8),
+                        f"5-qubit non-adjacent multiple sequence failed. Expected {expected}, got {statevector}")
         
     def test_parametrized_circuit(self):
         data={"number_of_qubits": 3,"gates": [{"qubits": [0],"gate": "H","parameters":[]},{"qubits": [0],"gate": "RY","parameters":[0.244444444]},{"qubits": [0],"gate": "RY","parameters":[0.245444444]}]}
