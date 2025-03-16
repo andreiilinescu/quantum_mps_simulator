@@ -2,16 +2,17 @@ import sqlite3
 import quantum_gates as quantum_gates
 import numpy as np
 import json
+import tracemalloc
+import pandas as pd
 from timeit import default_timer as timer
+from svd_udf_py import SvdAggregator
 from plotting import plot_statevector
-from scipy.sparse import coo_matrix
-
-MAX_BOND=10
 class SQLITE_MPS:
       def __init__(self,qbits:int,gates:dict):
             self.num_qbits=qbits
             self.times=[]
             self.conn = sqlite3.connect(":memory:")
+            self.conn.create_aggregate("svd_agg", 8, SvdAggregator)
             gates["SWAP"]=np.array([[1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,0,1]]).reshape((2,2,2,2))
             self.initialize_db()
             self.init_gates(gates)
@@ -67,62 +68,36 @@ class SQLITE_MPS:
                   for q1, q2 in reversed(path):
                         self._two_qubit_contraction(q1, q2, "SWAP")
       def _two_qubit_contraction(self,first_qbit:int,second_qubit:int,gate:str):
-            res=self.conn.execute(f"""
+            cursor=self.conn.execute(f"""
                                     WITH cont AS (SELECT A.i as i, A.j as j, B.j as k, B.k as l, SUM(B.re * A.re - B.im * A.im) AS re, SUM(B.re * A.im + B.im * A.re) AS im 
-                                          FROM t{first_qbit} as A JOIN  t{second_qubit} B ON A.k= B.i GROUP BY A.i,A.j,B.j,B.k )
+                                          FROM t{first_qbit} as A JOIN  t{second_qubit} B ON A.k= B.i GROUP BY A.i,A.j,B.j,B.k ),
+                                     tTempq  AS (
                                     SELECT A.i as i, B.k as j, B.l as k, A.l as l, SUM(B.re * A.re - B.im * A.im) AS re, SUM(B.re * A.im + B.im * A.re) AS im
-                                    FROM cont as A JOIN t{gate} as  B on A.j=B.i AND A.k=B.j GROUP BY A.i, B.k, B.l, A.l HAVING SUM(B.re * A.re - B.im * A.im)!=0 OR SUM(B.re * A.im + B.im * A.re)!=0        
-                                   """).fetchall()
-            left=self.conn.execute(f"""SELECT "left"  FROM tShape WHERE qbit = {first_qbit}""").fetchone()[0]
-            right=self.conn.execute(f"""SELECT "right" FROM tShape WHERE qbit = {second_qubit}""").fetchone()[0]
+                                    FROM cont as A JOIN t{gate} as  B on A.j=B.i AND A.k=B.j GROUP BY A.i, B.k, B.l, A.l HAVING SUM(B.re * A.re - B.im * A.im)!=0 OR SUM(B.re * A.im + B.im * A.re)!=0  
+                                          )
+                                    SELECT svd_agg(i,j,k,l,re,im, (SELECT "left"  FROM tShape WHERE qbit = {first_qbit}),(SELECT "right" FROM tShape WHERE qbit = {second_qubit}))
+                                    FROM tTempq""")
             #clear tables
             self.conn.execute(f"DELETE  FROM   t{first_qbit};")
             self.conn.execute(f"DELETE  FROM   t{second_qubit};")
-            U,Vh,sh=self._svd(res,left,right)
-            for idx, v in np.ndenumerate(U):
-                  if v !=0.0:
-                        self.conn.execute(f"INSERT INTO t{first_qbit} (i, j,k, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]} , {v.real}, {v.imag})")
-  
-            for idx, v in np.ndenumerate(Vh):
-                  if v !=0.0:
-                        self.conn.execute(f"INSERT INTO t{second_qubit} (i, j,k, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]} , {v.real}, {v.imag})")
-            
+            result_json = json.loads(cursor.fetchone()[0])
+            u_re=np.array(result_json["U_re"])
+            u_im=np.array(result_json["U_im"])
+            for idx, v in np.ndenumerate(u_re):
+                  v2=u_im[idx]
+                  if v !=0.0 or v2!=0.0:
+                        self.conn.execute(f"INSERT INTO t{first_qbit} (i, j,k, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]} , {v}, {v2})")
+            v_re=np.array(result_json["Vh_re"])
+            v_im=np.array(result_json["Vh_im"])
+            for idx, v in np.ndenumerate(v_re):
+                  v2=v_im[idx]
+                  if v !=0.0 or v2!=0.0:
+                        self.conn.execute(f"INSERT INTO t{second_qubit} (i, j,k, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]} , {v}, {v2})")
+
+            sh=result_json["sh"]
             self.conn.execute(f"UPDATE tShape SET left={sh[0][0]}, right={sh[0][1]} WHERE qbit={first_qbit}")
             self.conn.execute(f"UPDATE tShape SET left={sh[1][0]}, right={sh[1][1]} WHERE qbit={second_qubit}")
 
-      def _svd(self,res:list,l:int,r:int):
-            n=len(res)
-            rows=np.zeros(n)
-            cols=np.zeros(n)
-            vals=np.zeros(n,dtype=np.complex128)
-            for i,x in enumerate(res):
-                  rows[i]=2*x[0]+x[1]
-                  cols[i]=r*x[2]+x[3]
-                  vals[i]=x[4]+x[5]*1j
-            # Construct the sparse matrix
-            try:
-                  M = coo_matrix(
-                  (vals, (rows, cols)),
-                  shape=(2*l, 2*r)
-                  )
-            except  Exception as e:
-                  print(e)
-
-            U, S, Vh = np.linalg.svd(M.toarray(), full_matrices=False)
-
-            if len(S)>MAX_BOND:
-                  U = U[:, :MAX_BOND]
-                  S = S[:MAX_BOND]
-                  Vh = Vh[:MAX_BOND, :]
-            S=np.diag(S)
-
-
-            U=U.reshape(l,2,int(U.size//l//2))
-
-            Vh = S @ Vh
-            Vh=Vh.reshape(int(Vh.size//r//2),2,r)
-
-            return U,Vh, [(l,int(U.size//l//2)),(int(Vh.size//r//2),r)]
 
       def get_statevector_np(self):
             s=self.conn.execute("SELECT * FROM tShape").fetchall()

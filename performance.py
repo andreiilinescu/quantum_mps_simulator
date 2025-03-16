@@ -37,15 +37,16 @@ def save_data_to_file(data,filename:str):
 
 
     
-MAX_QBITS=100
+MAX_QBITS=50
 ITER=500
+SYSTEM="MAC"
 if __name__ =="__main__":
     
     data= time_ghz_execution(MAX_QBITS,ITER)
     med=get_medians(data)
     data["times"]=med
     plot_multiple_lines(data["max_qubits"],[list(data["times"].values())],["sqlite_mps"],"Number of Qubits","Time (s)","Sqlite MPS ")
-    with open("./new_data/ghz_{MAX_QBITS}_{ITER}_median.json", "w") as outfile: 
+    with open(f"./new_data/ghz_{SYSTEM}_{MAX_QBITS}_{ITER}_median.json", "w") as outfile: 
         json.dump(data, outfile)
     # file = open("./data/ghz_20_100_sum.json")
     # data=json.load(file)
