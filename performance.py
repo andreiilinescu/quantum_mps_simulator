@@ -3,6 +3,8 @@ from timeit import default_timer as timer
 import numpy as np
 import json
 from plotting import plot_multiple_lines
+from termcolor import colored
+import tracemalloc
 def generate_ghz_circuit(num_qubits:int) -> dict:
     data={ "number_of_qubits":num_qubits,"gates":[]}
     data["gates"].append({ "qubits": [0],"gate": "H"})
@@ -32,23 +34,72 @@ def get_medians(data:dict):
 def save_data_to_file(data,filename:str):
     if not filename.endswith(".json"):
         filename+=".json"
-    with open("./data/"+filename, 'w') as f:
+    with open("./new_data/"+filename, 'w') as f:
         json.dump(data, f)
 
 
-    
+def get_current_median_time(qbits_num:int,iters:int):
+    circ=generate_ghz_circuit(qbits_num)
+    times=[]
+    for i in range(iters):
+        tmp=SQLITE_MPS.run_circuit_json(circ).times
+        times.append(sum(tmp))
+    return np.median(times)
+
+def get_current_median_memory(qbits_num:int,iters:int):
+    circ=generate_ghz_circuit(qbits_num)
+    mems=[]
+    for i in range(iters):
+        tracemalloc.start()
+        SQLITE_MPS.run_circuit_json(circ)
+        curr,peak=tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        mems.append(peak)
+    return np.median(mems)
+
+def get_current_baseline(num_qubits,iters):
+    data={"circuit_name":"GHZ","simulator":"SQLITE NO UDF","num_qbits":num_qubits,"iterations":num_qubits,"time":None,"memory_peak":None}
+    data["memory_peak"]=get_current_median_memory(num_qubits,iters)
+    data["time"]=get_current_median_time(num_qubits,iters)
+
+    return data
+
+def compare_current_baseline(old:dict):
+    curr=get_current_baseline(old["num_qbits"],old["iterations"])
+    print(f"Baseline Time:{old["time"]}")
+    print(f"Baseline Memory Peak:{old["memory_peak"]}")
+    print("")
+    print(f"Current Time:{curr["time"]}")
+    print(f"Current Memory Peak:{curr["memory_peak"]}")
+    print("--------------")
+    time_diff=curr["time"]-old["time"]
+    mem_diff=curr["memory_peak"]-old["memory_peak"]
+    if time_diff<=0:
+        print(colored(f"Time:{time_diff}", "green"))
+    else:
+        print(colored(f"Time:{time_diff}", "red"))
+    if mem_diff<=0:
+        print(colored(f"Memory Peak:{mem_diff}", "green"))
+    else:
+        print(colored(f"Memory Peak:{mem_diff}", "red"))
+
 MAX_QBITS=50
 ITER=500
 SYSTEM="MAC"
-if __name__ =="__main__":
-    
+def plot_save_data_ghz():
     data= time_ghz_execution(MAX_QBITS,ITER)
     med=get_medians(data)
     data["times"]=med
     plot_multiple_lines(data["max_qubits"],[list(data["times"].values())],["sqlite_mps"],"Number of Qubits","Time (s)","Sqlite MPS ")
     with open(f"./new_data/ghz_{SYSTEM}_{MAX_QBITS}_{ITER}_median.json", "w") as outfile: 
         json.dump(data, outfile)
-    # file = open("./data/ghz_20_100_sum.json")
+
+if __name__ =="__main__":
+    # data=get_current_baseline(50,500)
+    # save_data_to_file(data,f"baselines/baseline_noudf_{SYSTEM}_{MAX_QBITS}_{ITER}_17_03_2024.json")
+    file = open("./new_data/baselines/baseline_noudf_MAC_100_100_17_03_2024.json")
+    old_data=json.load(file)
+    compare_current_baseline(old_data)
     # data=json.load(file)
     # file=open("./data/ghz_hybrid_20_50_median.json")
     # data2=json.load(file)
