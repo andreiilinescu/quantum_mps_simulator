@@ -79,17 +79,12 @@ class SQLITE_MPS:
             self.conn.execute(f"DELETE  FROM   t{first_qbit};")
             self.conn.execute(f"DELETE  FROM   t{second_qubit};")
             U,Vh,sh=self._svd(res,left,right)
-            for idx, v in np.ndenumerate(U):
-                  if v !=0.0:
-                        self.conn.execute(f"INSERT INTO t{first_qbit} (i, j,k, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]} , {v.real}, {v.imag})")
-  
-            for idx, v in np.ndenumerate(Vh):
-                  if v !=0.0:
-                        self.conn.execute(f"INSERT INTO t{second_qubit} (i, j,k, re,im) VALUES ({idx[0]},{idx[1]},{idx[2]} , {v.real}, {v.imag})")
-            
-            self.conn.execute(f"UPDATE tShape SET left={sh[0][0]}, right={sh[0][1]} WHERE qbit={first_qbit}")
-            self.conn.execute(f"UPDATE tShape SET left={sh[1][0]}, right={sh[1][1]} WHERE qbit={second_qubit}")
-
+            self.insert_nonzero_elements_3indices(U,first_qbit)
+            self.insert_nonzero_elements_3indices(Vh,second_qubit)
+            self.conn.executemany(
+            "UPDATE tShape SET left = ?, right = ? WHERE qbit = ?",
+            [(sh[0][0], sh[0][1], first_qbit), (sh[1][0], sh[1][1], second_qubit)]
+      )
       def _svd(self,res:list,l:int,r:int):
             n=len(res)
             rows=np.zeros(n)
@@ -123,6 +118,23 @@ class SQLITE_MPS:
             Vh=Vh.reshape(int(Vh.size//r//2),2,r)
 
             return U,Vh, [(l,int(U.size//l//2)),(int(Vh.size//r//2),r)]
+
+      def insert_nonzero_elements_3indices(self, matrix:np.ndarray, table):
+            # Find indices where U is nonzero
+            nonzero_indices = np.nonzero(matrix)
+            # Extract corresponding values
+            values = matrix[nonzero_indices]
+            # Prepare a list of tuples for batch insert
+            data = [
+                  (int(i), int(j), int(k), v.real, v.imag) 
+                  for (i, j, k), v in zip(zip(*nonzero_indices), values)
+            ]
+            # Execute batch insert
+            self.conn.executemany(
+                  f"INSERT INTO t{table} (i, j, k, re, im) VALUES (?, ?, ?, ?, ?)", 
+                  data
+            )
+
 
       def get_statevector_np(self):
             s=self.conn.execute("SELECT * FROM tShape").fetchall()

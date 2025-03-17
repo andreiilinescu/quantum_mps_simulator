@@ -1,1 +1,1 @@
-{"circuit_name": "GHZ", "simulator": "SQLITE NO UDF", "num_qbits": 100, "iterations": 100, "time": 0.02609781757928431, "memory_peak": 73476.0}
+{"improvement":"more efficient batch insert after svd","circuit_name": "GHZ", "simulator": "SQLITE NO UDF", "num_qbits": 100, "iterations": 100, "time": 0.02461468451656401, "memory_peak": 75179.0}

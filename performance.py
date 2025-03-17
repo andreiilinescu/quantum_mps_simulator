@@ -83,8 +83,8 @@ def compare_current_baseline(old:dict):
     else:
         print(colored(f"Memory Peak:{mem_diff}", "red"))
 
-MAX_QBITS=50
-ITER=500
+MAX_QBITS=100
+ITER=100
 SYSTEM="MAC"
 def plot_save_data_ghz():
     data= time_ghz_execution(MAX_QBITS,ITER)
@@ -95,7 +95,7 @@ def plot_save_data_ghz():
         json.dump(data, outfile)
 
 if __name__ =="__main__":
-    # data=get_current_baseline(50,500)
+    # data=get_current_baseline(MAX_QBITS,ITER)
     # save_data_to_file(data,f"baselines/baseline_noudf_{SYSTEM}_{MAX_QBITS}_{ITER}_17_03_2024.json")
     file = open("./new_data/baselines/baseline_noudf_MAC_100_100_17_03_2024.json")
     old_data=json.load(file)

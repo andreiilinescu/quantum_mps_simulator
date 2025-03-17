@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from sqlite_mps_full_analytics import SQLITE_MPS
+from old.sqlite_mps_full_analytics import SQLITE_MPS
 from performance import generate_ghz_circuit
 from plotting import plot_stacked_bars
 KEYS_ONE = ['pure_contraction', 'cleanup']
