@@ -86,24 +86,12 @@ class SQLITE_MPS:
             [(sh[0][0], sh[0][1], first_qbit), (sh[1][0], sh[1][1], second_qubit)]
       )
       def _svd(self,res:list,l:int,r:int):
-            n=len(res)
-            rows=np.zeros(n)
-            cols=np.zeros(n)
-            vals=np.zeros(n,dtype=np.complex128)
-            for i,x in enumerate(res):
-                  rows[i]=2*x[0]+x[1]
-                  cols[i]=r*x[2]+x[3]
-                  vals[i]=x[4]+x[5]*1j
-            # Construct the sparse matrix
-            try:
-                  M = coo_matrix(
-                  (vals, (rows, cols)),
-                  shape=(2*l, 2*r)
-                  )
-            except  Exception as e:
-                  print(e)
+            m=np.zeros((2*l,2*r), dtype=np.complex128)
+            for x in res:
+                  m[2*x[0]+x[1]][r*x[2]+x[3]]=x[4]+x[5]*1j
+          
 
-            U, S, Vh = np.linalg.svd(M.toarray(), full_matrices=False)
+            U, S, Vh = np.linalg.svd(m, full_matrices=False)
 
             if len(S)>MAX_BOND:
                   U = U[:, :MAX_BOND]
