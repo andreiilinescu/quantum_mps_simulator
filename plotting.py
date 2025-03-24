@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from itertools import product
-
+import json
 
 def plot_statevector(MPS: np.ndarray):
     MPS=MPS.flatten()
@@ -74,3 +74,7 @@ def plot_stacked_bars(xlabels: list[str], avgs: list[dict[str, float]], title: s
 
     plt.show()
 
+if __name__=="__main__":
+    data=json.load(open("./new_data/ghz_MAC_50_500_median-NoUDF.json"))
+    data2=json.load(open("./new_data/ghz_MAC_50_500_median.json"))
+    plot_multiple_lines(data["max_qubits"],[list(data2["times"].values()),list(data["times"].values())],["sqlite_mps","sqlite_mps_optimized"],"Number of Qubits","Time (s)","Sqlite MPS VS OPTIMIZED Sqlite MPS")

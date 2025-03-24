@@ -90,18 +90,13 @@ class SQLITE_MPS:
             for x in res:
                   m[2*x[0]+x[1]][r*x[2]+x[3]]=x[4]+x[5]*1j
           
-
             U, S, Vh = np.linalg.svd(m, full_matrices=False)
-
             if len(S)>MAX_BOND:
                   U = U[:, :MAX_BOND]
                   S = S[:MAX_BOND]
                   Vh = Vh[:MAX_BOND, :]
             S=np.diag(S)
-
-
             U=U.reshape(l,2,int(U.size//l//2))
-
             Vh = S @ Vh
             Vh=Vh.reshape(int(Vh.size//r//2),2,r)
 

@@ -84,8 +84,8 @@ def compare_current_baseline(old:dict):
         print(colored(f"Memory Peak:{mem_diff}", "red"))
 
 MAX_QBITS=100
-ITER=100
-SYSTEM="MAC"
+ITER=250
+SYSTEM="PC-2080s"
 def plot_save_data_ghz():
     data= time_ghz_execution(MAX_QBITS,ITER)
     med=get_medians(data)
@@ -95,14 +95,30 @@ def plot_save_data_ghz():
         json.dump(data, outfile)
 
 if __name__ =="__main__":
-    # data=get_current_baseline(MAX_QBITS,ITER)
-    # save_data_to_file(data,f"baselines/baseline_noudf_{SYSTEM}_{MAX_QBITS}_{ITER}_17_03_2024.json")
-    file = open("./new_data/baselines/baseline_noudf_MAC_100_100_17_03_2024.json")
-    old_data=json.load(file)
-    compare_current_baseline(old_data)
-    # data=json.load(file)
-    # file=open("./data/ghz_hybrid_20_50_median.json")
+
+    # data=time_ghz_execution(MAX_QBITS,ITER)
+    # data["times"]=get_medians(data)
+    # json.dump(data,open(f"./new_data/ghz_{SYSTEM}_{MAX_QBITS}_{ITER}_median_24_03_2025.json","w"))
+
+
+    # file=open("./old/data/ghz_10_10_sum.json")
     # data2=json.load(file)
-    # med=get_medians(data)
-    # data["times"]=med
-    # plot_multiple_lines(data["max_qubits"],[list(data["times"].values()),list(data2["times"].values())],["sqlite_mps","hybrid_mps"],"Number of Qubits","Time (s)","Sqlite MPS VS Hybrid MPS")
+    # data2["times"]=get_medians(data2)
+    # plot_multiple_lines(data["max_qubits"],[list(data["times"].values()),list(data2["times"].values())],["sqlite_mps","sqlite_mps(OLD)"],"Number of Qubits","Time (s)","Sqlite MPS VS OLD SQLITE MPS")
+
+
+    # data=get_current_baseline(MAX_QBITS,ITER)
+    # save_data_to_file(data,f"baselines/baseline_densesvd_{SYSTEM}_{MAX_QBITS}_{ITER}_24_03_2024.json")
+
+
+    # file = open("./new_data/baselines/baseline_noudf_PC-2080s_100_200_24_03_2024.json")
+    # old_data=json.load(file)
+    # compare_current_baseline(old_data)
+
+    file=open("./new_data/ghz_PC-2080s_100_250_median_24_03_2025.json")
+    data=json.load(file)
+    file=open("./old/data/ghz_100_50_median.json")
+    data2=json.load(file)
+    med=get_medians(data)
+    data["times"]=med
+    plot_multiple_lines(data["max_qubits"],[list(data["times"].values()),list(data2["times"].values())],["sqlite_mps","old_sqlite_mps"],"Number of Qubits","Time (s)","SQLITE MPS VS OLD SQLITE MPS")
