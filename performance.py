@@ -83,18 +83,40 @@ def compare_current_baseline(old:dict):
     else:
         print(colored(f"Memory Peak:{mem_diff}", "red"))
 
-MAX_QBITS=100
-ITER=250
+
+def simulate_times(circuit_creator, num_qubits_list:list, num_iters):
+    full_times={}
+    for num_qubits in num_qubits_list:
+        times=[]
+        for _ in range(num_iters):
+            circ = circuit_creator(num_qubits)
+            meta=SQLITE_MPS.run_circuit_json(circ)
+            times.append(np.sum(meta.times))
+        full_times[str(num_qubits)]=times
+    return full_times
+
+
+
+MIN_QUBITS=200
+MAX_QUBITS=1000
+ITER=100
+STEP=100
 SYSTEM="PC-2080s"
 def plot_save_data_ghz():
-    data= time_ghz_execution(MAX_QBITS,ITER)
+    data= time_ghz_execution(MAX_QUBITS,ITER)
     med=get_medians(data)
     data["times"]=med
     plot_multiple_lines(data["max_qubits"],[list(data["times"].values())],["sqlite_mps"],"Number of Qubits","Time (s)","Sqlite MPS ")
-    with open(f"./new_data/ghz_{SYSTEM}_{MAX_QBITS}_{ITER}_median.json", "w") as outfile: 
+    with open(f"./new_data/ghz_{SYSTEM}_{MAX_QUBITS}_{ITER}_median.json", "w") as outfile: 
         json.dump(data, outfile)
 
 if __name__ =="__main__":
+
+    times=simulate_times(generate_ghz_circuit, list(range(MIN_QUBITS,MAX_QUBITS+1,STEP)), ITER)
+    for i in range(MIN_QUBITS,MAX_QUBITS+1,STEP):
+        times[str(i)]=np.median(times[str(i)])
+    save_data_to_file({"simulator":"sqlite_mps","state":"GHZ","system":SYSTEM,"min_qubits":MIN_QUBITS,"max_qubits":MAX_QUBITS,"step_qubits":STEP,"iter":ITER,"times":times},f"ghz_{SYSTEM}_({MIN_QUBITS}_{MAX_QUBITS}_{STEP})_{ITER}.json")
+
 
     # data=time_ghz_execution(MAX_QBITS,ITER)
     # data["times"]=get_medians(data)
@@ -115,10 +137,12 @@ if __name__ =="__main__":
     # old_data=json.load(file)
     # compare_current_baseline(old_data)
 
-    file=open("./new_data/ghz_PC-2080s_100_250_median_24_03_2025.json")
-    data=json.load(file)
-    file=open("./old/data/ghz_100_50_median.json")
-    data2=json.load(file)
-    med=get_medians(data)
-    data["times"]=med
-    plot_multiple_lines(data["max_qubits"],[list(data["times"].values()),list(data2["times"].values())],["sqlite_mps","old_sqlite_mps"],"Number of Qubits","Time (s)","SQLITE MPS VS OLD SQLITE MPS")
+    # file=open("./new_data/ghz_PC-2080s_100_250_median_24_03_2025.json")
+    # data=json.load(file)
+    # file=open("./old/data/ghz_100_50_median.json")
+    # data2=json.load(file)
+    # med=get_medians(data)
+    # data["times"]=med
+    # plot_multiple_lines(data["max_qubits"],[list(data["times"].values()),list(data2["times"].values())],["sqlite_mps","old_sqlite_mps"],"Number of Qubits","Time (s)","SQLITE MPS VS OLD SQLITE MPS")
+
+

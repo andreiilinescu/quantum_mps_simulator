@@ -17,20 +17,20 @@ def plot_statevector(MPS: np.ndarray):
     plt.ylim(0, 1)
     plt.show()
 
-def plot_multiple_lines(num_qubits,ys,labels, x_axis_label:str='X-axis',y_axis_label:str='Y-axis',title:str='Multiple Lines Connecting Scatter Points'):
-
-    x=list(range(2,num_qubits+1))
+def plot_multiple_lines(max_qbits:int,ys,labels, x_axis_label:str='X-axis',y_axis_label:str='Y-axis',title:str='Multiple Lines Connecting Scatter Points', min_qbits:int=2,step:int=1):
+    x = list(range(min_qbits, max_qbits + 1,step))
     for y, label in zip(ys, labels):
         if len(x) != len(y):
             raise ValueError(f"x and y must have the same length. Found {len(x)} and {len(y)} for label '{label}'.")
         plt.scatter(x, y, label=label)  # Plot scatter points
-        plt.plot(x, y)                 # Connect points with a line
+        plt.plot(x, y, linestyle='-', marker='o')  # Connect points with a line and add markers for clarity
     
     plt.xlabel(x_axis_label)
     plt.ylabel(y_axis_label)
     plt.title(title)
     plt.legend()
-    plt.grid(True)
+    plt.grid(visible=True, linestyle='--', alpha=0.7)  # Improve grid visibility
+    plt.tight_layout()  # Adjust layout to prevent clipping
     plt.show()
 
 def plot_stacked_bars(xlabels: list[str], avgs: list[dict[str, float]], title: str = 'Time Breakdown by Contraction Type'):
@@ -74,7 +74,9 @@ def plot_stacked_bars(xlabels: list[str], avgs: list[dict[str, float]], title: s
 
     plt.show()
 
+
+
 if __name__=="__main__":
-    data=json.load(open("./new_data/ghz_MAC_50_500_median-NoUDF.json"))
-    data2=json.load(open("./new_data/ghz_MAC_50_500_median.json"))
-    plot_multiple_lines(data["max_qubits"],[list(data2["times"].values()),list(data["times"].values())],["sqlite_mps","sqlite_mps_optimized"],"Number of Qubits","Time (s)","Sqlite MPS VS OPTIMIZED Sqlite MPS")
+    data=json.load(open("./new_data/ghz_PC-2080s_(200_1000_100)_100.json"))
+    data2=json.load(open("./new_data/qiskit/ghz_PC-2080s_(200_1000_100)_100.json"))
+    plot_multiple_lines(data["max_qubits"],[list(data["times"].values()),list(data2["times"].values())],["sqlite_mps","qiskit_aer_mps"],"Number of Qubits","Time (s)","Sqlite MPS vs Qiskit Aer MPS",data["min_qubits"],data["step_qubits"])
