@@ -1,16 +1,13 @@
 from sqlite_mps import SQLITE_MPS
+from plotting import plot_multiple_lines
+from circuit_generator import *
+
 from timeit import default_timer as timer
 import numpy as np
 import json
-from plotting import plot_multiple_lines
 from termcolor import colored
 import tracemalloc
-def generate_ghz_circuit(num_qubits:int) -> dict:
-    data={ "number_of_qubits":num_qubits,"gates":[]}
-    data["gates"].append({ "qubits": [0],"gate": "H"})
-    for i in range(num_qubits-1):
-        data['gates'].append({ "qubits": [i, i+1],"gate": "CNOT"})
-    return data
+
 
 def time_ghz_execution(max_qubit:int , num_iterations:int, keep_only_sum=True):
     data={"name":"sqlite_mps GHZ Circuit","max_qubits":max_qubit,"num_iterations":num_iterations,"times":{}}
@@ -95,7 +92,9 @@ def simulate_times(circuit_creator, num_qubits_list:list, num_iters):
         full_times[str(num_qubits)]=times
     return full_times
 
-
+def run_circuit(circ):
+    metadata = SQLITE_MPS.run_circuit_json(circ)
+    return {"total_exec_time":sum(metadata.times)}
 
 MIN_QUBITS=200
 MAX_QUBITS=1000
@@ -111,11 +110,11 @@ def plot_save_data_ghz():
         json.dump(data, outfile)
 
 if __name__ =="__main__":
-
-    times=simulate_times(generate_ghz_circuit, list(range(MIN_QUBITS,MAX_QUBITS+1,STEP)), ITER)
-    for i in range(MIN_QUBITS,MAX_QUBITS+1,STEP):
-        times[str(i)]=np.median(times[str(i)])
-    save_data_to_file({"simulator":"sqlite_mps","state":"GHZ","system":SYSTEM,"min_qubits":MIN_QUBITS,"max_qubits":MAX_QUBITS,"step_qubits":STEP,"iter":ITER,"times":times},f"ghz_{SYSTEM}_({MIN_QUBITS}_{MAX_QUBITS}_{STEP})_{ITER}.json")
+    print(run_circuit(generate_qft_circuit(10)))
+    # times=simulate_times(generate_ghz_circuit, list(range(MIN_QUBITS,MAX_QUBITS+1,STEP)), ITER)
+    # for i in range(MIN_QUBITS,MAX_QUBITS+1,STEP):
+    #     times[str(i)]=np.median(times[str(i)])
+    # save_data_to_file({"simulator":"sqlite_mps","state":"GHZ","system":SYSTEM,"min_qubits":MIN_QUBITS,"max_qubits":MAX_QUBITS,"step_qubits":STEP,"iter":ITER,"times":times},f"ghz_{SYSTEM}_({MIN_QUBITS}_{MAX_QUBITS}_{STEP})_{ITER}.json")
 
 
     # data=time_ghz_execution(MAX_QBITS,ITER)
