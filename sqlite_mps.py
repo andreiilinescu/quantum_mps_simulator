@@ -5,8 +5,10 @@ import json
 from timeit import default_timer as timer
 from plotting import plot_statevector
 from scipy.sparse import coo_matrix
+from scipy.sparse.linalg import svds
 
 MAX_BOND = 10
+DENSITY_TRESHOLD = 0.1
 
 
 class SQLITE_MPS:
@@ -71,7 +73,7 @@ class SQLITE_MPS:
 
     def apply_two_qbit_gate(self, first_qbit: int, second_qubit: int, gate: str):
         if second_qubit - first_qbit == 1:
-            self._two_qubit_contraction(first_qbit, first_qbit + 1, gate)
+            self._two_qubit_contraction(first_qbit, second_qubit, gate)
         else:
             path = []
             add = False
@@ -120,16 +122,41 @@ class SQLITE_MPS:
         )
 
     def _svd(self, res: list, l: int, r: int):
-        m = np.zeros((2 * l, 2 * r), dtype=np.complex128)
-        for x in res:
-            m[2 * x[0] + x[1]][r * x[2] + x[3]] = x[4] + x[5] * 1j
+        density = len(res) / (l * r)
+        if density < DENSITY_TRESHOLD and l * r > 1000 and min(2 * l, 2 * r) > MAX_BOND:
+            return self._sparse_svd(res, l, r)
+        else:
+            m = np.zeros((2 * l, 2 * r), dtype=np.complex128)
+            for x in res:
+                m[2 * x[0] + x[1]][r * x[2] + x[3]] = x[4] + x[5] * 1j
 
-        U, S, Vh = np.linalg.svd(m, full_matrices=False)
-        if len(S) > MAX_BOND:
-            U = U[:, :MAX_BOND]
-            S = S[:MAX_BOND]
-            Vh = Vh[:MAX_BOND, :]
-        S = np.diag(S)
+            U, S, Vh = np.linalg.svd(m, full_matrices=False)
+            if len(S) > MAX_BOND:
+                U = U[:, :MAX_BOND]
+                S = S[:MAX_BOND]
+                Vh = Vh[:MAX_BOND, :]
+            S = np.diag(S)
+            U = U.reshape(l, 2, int(U.size // l // 2))
+            Vh = S @ Vh
+            Vh = Vh.reshape(int(Vh.size // r // 2), 2, r)
+
+            return U, Vh, [(l, int(U.size // l // 2)), (int(Vh.size // r // 2), r)]
+
+    def _sparse_svd(self, res: list, l: int, r: int):
+        # Create a sparse matrix in COO format
+        rows = []
+        cols = []
+        data = []
+        for x in res:
+            rows.append(2 * x[0] + x[1])
+            cols.append(r * x[2] + x[3])
+            data.append(x[4] + x[5] * 1j)
+
+        sparse_matrix = coo_matrix((data, (rows, cols)), shape=(2 * l, 2 * r))
+
+        # Perform SVD on the sparse matrix
+        U, S, Vh = svds(sparse_matrix, k=MAX_BOND, which="LM")
+
         U = U.reshape(l, 2, int(U.size // l // 2))
         Vh = S @ Vh
         Vh = Vh.reshape(int(Vh.size // r // 2), 2, r)
@@ -190,7 +217,6 @@ class SQLITE_MPS:
             applied_gates.append((name, gate["qubits"]))
 
         sim = SQLITE_MPS(num_qubits, sim_gates)
-
         for gate in applied_gates:
             name, qbits = gate
             tic = timer()

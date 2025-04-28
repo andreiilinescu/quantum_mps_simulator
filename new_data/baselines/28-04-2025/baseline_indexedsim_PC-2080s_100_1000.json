@@ -1,0 +1,1 @@
+{"circuit_name": "GHZ", "simulator": "SQLITE NO UDF", "num_qbits": 100, "iterations": 1000, "time": 0.01945413300745713, "memory_peak": 73392.0}
